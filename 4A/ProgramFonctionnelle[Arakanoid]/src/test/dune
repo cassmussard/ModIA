@@ -1,0 +1,3 @@
+(test
+ (name arkanoid)
+ (libraries arkanoid graphics unix))

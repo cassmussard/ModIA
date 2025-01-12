@@ -1,0 +1,32 @@
+# Use an official Python runtime as the parent image
+FROM python:3.9.12
+# Set the working directory in the container to /app
+WORKDIR /app
+# Copy the current directory contents into the container at /app
+COPY . /app
+
+# Google drive
+RUN pip install gdown
+
+################ Movie poster dataset ################
+RUN gdown --id '1BdCAAaWpiLlqZUr6lRPIQ3BJLiFJx_nW' --output MLP-20M.zip
+# ZIP size
+RUN ls -lh MLP-20M.zip
+# unzip the zip file
+RUN apt-get update && apt-get install -y unzip
+RUN unzip MLP-20M.zip || echo "Erreur lors de la décompression"
+################ Text csv dataset ################
+RUN gdown --id '1fIDOtiBCONhv8pfWVMCrfxKJeKfS4b9y' --output movies_metadata.csv
+############### Annoy indexes ###############
+RUN gdown --id '1ZnX_FX0LGGb_R9NrSg1LVg7KQ1anmF-O' --output annoy_db_text.ann
+RUN gdown --id '1k_Fat45MlSihQz3YVt6i8PRyesWmZ5i9' --output annoy_db_img.ann
+
+# Install any needed packages specified in requirements_api.txt
+RUN pip install --trusted-host pypi.python.org -r requirements_api.txt
+
+# Make port 5000 available to the world outside this container
+EXPOSE 5000
+# Define environment variable for Flask to run in production mode
+ENV FLASK_ENV=production
+# Run http_api.py when the container launches
+CMD ["python", "http_api.py"]

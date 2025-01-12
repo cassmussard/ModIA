@@ -1,0 +1,4 @@
+(executable
+ (public_name arkanoid)
+ (name main)
+ (libraries arkanoid graphics unix))

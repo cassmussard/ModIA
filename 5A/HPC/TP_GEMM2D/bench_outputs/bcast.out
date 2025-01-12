@@ -1,0 +1,26 @@
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'smpi/privatization' to '1'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'smpi/np' to '4'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'smpi/hostfile' to 'hostfiles/cluster_hostfile.txt'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'tracing' to 'yes'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'tracing/filename' to 'smpi_simgrid.trace'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'tracing/smpi' to 'yes'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'surf/precision' to '1e-9'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'network/model' to 'SMPI'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'smpi/tmpdir' to '/home/fgrivet/tmp_simgrid'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'smpi/tmpdir' to '/tmp'
+[0.000000] [smpi_config/INFO] You did not set the power of the host running the simulation.  The timings will certainly not be accurate.  Use the option "--cfg=smpi/host-speed:<flops>" to set its value.  Check https://simgrid.org/doc/latest/Configuring_SimGrid.html#automatic-benchmarking-of-smpi-code for more information.
+[snorki.enseeiht.fr] (bcast) measured_wtime = 1.296806s (la=0) | 44.711437 Gflop/s
+[snorki.enseeiht.fr] (g) measured_wtime = 1.229120s | 47.173635 Gflop/s
+GEMM is correct ( 0.00000e+00)
+[snorki.enseeiht.fr] (bcast) measured_wtime = 1.287216s (la=0) | 45.044546 Gflop/s
+[snorki.enseeiht.fr] (g) measured_wtime = 1.221593s | 47.464301 Gflop/s
+GEMM is correct ( 0.00000e+00)
+[snorki.enseeiht.fr] (bcast) measured_wtime = 1.286468s (la=0) | 45.070734 Gflop/s
+[snorki.enseeiht.fr] (g) measured_wtime = 1.223126s | 47.404810 Gflop/s
+GEMM is correct ( 0.00000e+00)
+[snorki.enseeiht.fr] (bcast) measured_wtime = 1.284869s (la=0) | 45.126827 Gflop/s
+[snorki.enseeiht.fr] (g) measured_wtime = 1.222992s | 47.410009 Gflop/s
+GEMM is correct ( 0.00000e+00)
+[snorki.enseeiht.fr] (bcast) measured_wtime = 1.286736s (la=0) | 45.061347 Gflop/s
+[snorki.enseeiht.fr] (g) measured_wtime = 1.222541s | 47.427497 Gflop/s
+GEMM is correct ( 0.00000e+00)

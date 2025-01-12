@@ -1,0 +1,480 @@
+---
+title: "homTest-project"
+author: "Lucas Zuliani"
+date: "2023-11-18"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r cars}
+library(evir)
+data(danish, package='evir')
+times <- attr(danish, "times")
+str(danish)
+summary(danish)
+```
+
+```{r}
+# Global evolution
+library(zoo)
+times_series_zoo <- zoo(danish, order.by = as.POSIXct(times))
+plot(times_series_zoo, type = "l", col = "blue", xlab = "Time", ylab = "Number of claims", main = "Number of claims per year")
+```
+
+```{r}
+# Evolution per year / month
+library(xts)
+times_series_xts <- xts(danish, order.by = as.POSIXct(times))
+par(mfrow = c(2, 1))
+plot(yearly_sum <- apply.yearly(times_series_xts, sum), type = "l", col = "blue", xlab = "Time", ylab = "Annual Sum", main = "Annual Evolution")
+plot(monthly_sum <- apply.monthly(times_series_xts, sum), type = "l", col = "red", xlab = "Time", ylab = "Monthly Sum", main = "Monthly Evolution")
+```
+
+
+```{r}
+# Thinning algorithm for PPi
+
+# lambda_parameters = c(intensity_fct, tetha, beta)
+
+simulPPi = function(lambda_parameters, Tstar)
+{
+  intensity_fct = lambda_parameters[[1]]
+  theta = lambda_parameters[[2]]
+  beta = lambda_parameters[[3]]
+  M = lambda_parameters[[4]]
+
+  
+  n <- rpois(1,M*Tstar)
+  t <- runif(n, 0, Tstar)  # Poisson Process with constant rate M on [0, T*]
+  
+  u <- runif(n, 0, M)
+  t <- t[u<=intensity_fct(t, theta, beta)]
+  
+  return(sort(t))
+}
+```
+
+```{r}
+# Parameters for testing
+exponential_intensity <- function(t, theta, beta)
+{
+  return(exp(theta*t))
+}
+
+logarithmic_intensity <- function(t, theta, beta)
+{
+  return(theta*log(t + 1))
+}
+
+weibull_intensity = function(t, theta, beta)
+{
+  return(theta*t**(theta-1))
+}
+```
+
+```{r}
+# Parameters
+Tstar=4
+lambda_parameters = c(exponential_intensity, theta=1, beta=0, M=exp(Tstar))
+
+# Generating PPi
+PPi = simulPPi(lambda_parameters, Tstar)
+# plot the counting process (with jumps = 1): 
+plot(c(0, PPi),seq(0, length(PPi)), type="s",xlab="Time t",ylab="Number of events by time t") 
+# add the arrival times on the horizontal axis: 
+points(c(0, PPi),rep(0, length(c(0, PPi))),type="p",pch=16, col = "blue")
+# link the arrival times with the counts:
+lines(c(0, PPi),seq(0, length(PPi)),type="h",lty=2)
+```
+```{r}
+library(ggplot2)
+plotDensity = function(X, title_name)
+{
+  df <- data.frame(len = X)
+  ggplot(df, aes(x = len)) +
+  geom_density(fill = "skyblue", color = "blue", alpha = 0.7) +
+  labs(title = title_name,
+       x = "Values",
+       y = "Density") +
+  theme_minimal()
+}
+```
+
+
+```{r}
+pvalue_Laplace = function(PPi, Tstar)
+{
+  n=length(PPi)
+  L <- sum(PPi/Tstar)
+  pvalue <- 1 - pnorm(sqrt(12*n)*(L/n - 0.5), mean=0, sd=1)
+  
+  return(pvalue)
+}
+
+pvalue_Weibull = function(PPi, Tstar)
+{
+  n=length(PPi)
+  Z <- 2*sum(log(Tstar/PPi))
+  pvalue <- pchisq(Z, df=2*n, lower.tail=TRUE)
+  
+  return(pvalue)
+}
+
+pvalue_Barlow = function(PPi, Tstart)
+{
+  n=length(PPi)
+  d = as.integer(n/2)
+  
+  Td = diff_days[d]
+  Tn = diff_days[n]
+  
+  Fobs <- (n-d)*Td/(d*(Tn - Td))
+  pvalue <- 1 - pf(Fobs, df1 = 2*n, df2 = 2*(n-d), lower.tail = TRUE)
+  
+  return(pvalue)
+}
+
+```
+
+
+```{r}
+# Ne fonctionne pas
+
+library(gmp)
+
+pvalue_LRT = function(PPi, Tstar)
+{
+  n=length(PPi)
+  PPi <- c(PPi, Tstar)
+  
+  if (n==0){
+   return(NaN) 
+  }
+
+  lambda_chapeau_T <- c()
+  
+  for (k in 1:n) {
+  # construction de la matrice de taille (k, n-k+1)
+    matrice <- matrix(0, nrow = k, ncol = n - k + 1)
+    
+    for (i in 1:k){
+      for (j in k:n){
+        matrice[i, j - k + 1] <- (j - i + 1)/(PPi[j+1] - PPi[i])
+      }
+    }
+
+  # calcul de lambda chapeau Tk
+    list_of_min <- c()
+    
+    for(i in 1:k){
+      list_of_min <- c(list_of_min, min(matrice[i, ]))
+    }
+  
+  # Ajout à la liste
+    lambda_chapeau_T = c(lambda_chapeau_T, max(list_of_min))
+  } 
+
+  W <- 2 * sum(log(lambda_chapeau_T) + n*log(Tstar/n))
+  
+  pvalue = 0
+  for (k in 1:n){
+    stir = asNumeric(abs(Stirling1(n, k)))
+    prob = 1-pchisq(W, df=k+1, lower.tail=TRUE)
+    pvalue =+ stir*prob  
+  }
+  
+  return(pvalue)
+}
+```
+
+
+```{r}
+n_mean_exponential = function(lambda_parameters, Tstar)
+{
+  theta = lambda_parameters[[2]]
+  n_mean = (exp(theta*Tstar)-1)/theta
+  
+  return(n_mean)
+}
+
+n_mean_Weibull = function(lambda_parameters, Tstar)
+{
+  theta = lambda_parameters[[2]]
+  n_mean = Tstar^theta
+  
+  return(n_mean)
+}
+
+n_mean_logarithmic = function(lambda_parameters, Tstar)
+{
+  theta = lambda_parameters[[2]]
+  n_mean = theta * ((Tstar + 1) * log(Tstar + 1) - (Tstar + 1))
+  
+  return(n_mean)
+}
+
+```
+
+```{r}
+# Test of pvalue function
+Tstar = 4
+lambda_parameters = c(exponential_intensity, theta=1, beta=0, M = exp(Tstar))
+
+PPi = simulPPi(lambda_parameters, Tstar=Tstar)
+pvalue = pvalue_Laplace(PPi, Tstar=4)
+print(pvalue)
+print(length(PPi))
+```
+```{r}
+# Normality test
+shapiro_test <- shapiro.test(PPi/Tstar)
+print(shapiro_test)
+```
+```{r}
+compute_power = function(lambda_parameters, compute_pvalue, Tstar, alpha, N)
+{
+  pvalues <- c()
+  
+  for (i in 1:N)
+  {
+    PPi = simulPPi(lambda_parameters, Tstar)
+    pvalue = compute_pvalue(PPi, Tstar)
+    pvalues <- c(pvalues, pvalue)
+  }
+  
+  power = length(pvalues[pvalues<=alpha]) / length(pvalues)
+  return(power)
+}
+```
+
+
+# Exponential intensity
+
+```{r}
+# Laplace Test with exponential intensity of parameters theta = 1 and beta = 0
+
+theta = 1
+
+powers = c()
+nmeans = c()
+
+for (Tstar in c(1.0, 2.0, 4.0))
+{
+  lambda_parameters = c(exponential_intensity, theta, beta=0, M=exp(theta*Tstar))
+  
+  power = compute_power(lambda_parameters, pvalue_Laplace, Tstar, alpha=0.05, N=1e4)
+  nmean = n_mean_exponential(lambda_parameters, Tstar)
+  
+  powers = c(powers, power)
+  nmeans = c(nmeans, nmean)
+}
+
+cat("T* =", 1, 2, 4, "\n")
+cat("n =", nmeans, "\n")
+cat("Powers of Laplace test", powers, "\n")
+```
+```{r}
+# Weibull Test with exponential intensity of parameters theta = 1 and beta = 0
+
+theta = 1
+
+powers = c()
+nmeans = c()
+
+for (Tstar in c(1.0, 2.0, 4.0)) 
+{
+  lambda_parameters = c(exponential_intensity, theta, beta=0, M=exp(theta*Tstar))
+
+  power = compute_power(lambda_parameters, pvalue_Weibull, Tstar, alpha=0.05, N=1e4)
+  nmean = n_mean_exponential(lambda_parameters, Tstar) 
+  
+  powers = c(powers, power)
+  nmeans = c(nmeans, nmean)
+}
+
+cat("Theta =", 1, 2, 4, "\n")
+cat("n =", nmeans, "\n")
+cat("Powers of Weibull test", powers, "\n")
+```
+```{r}
+# Barlow Test with exponential intensity of parameters theta = 1 and beta = 0
+
+theta = 1
+
+powers = c()
+nmeans = c()
+
+for (Tstar in c(1.0, 2.0, 4.0)) 
+{
+  lambda_parameters = c(exponential_intensity, theta, beta=0, M=exp(theta*Tstar))
+
+  power = compute_power(lambda_parameters, pvalue_Barlow, Tstar, alpha=0.05, N=1e4)
+  nmean = n_mean_exponential(lambda_parameters, Tstar) 
+  
+  powers = c(powers, power)
+  nmeans = c(nmeans, nmean)
+}
+
+cat("Theta =", 1, 2, 4, "\n")
+cat("n =", nmeans, "\n")
+cat("Powers of Weibull test", powers, "\n")
+```
+
+# Logarithmic intensity
+
+```{r}
+# Laplace Test with logarithmic intensity of parameters theta = 1 and beta = 0
+
+theta = 1
+
+powers = c()
+nmeans = c()
+
+for (Tstar in c(10.0, 15.0, 25.0))
+{
+  lambda_parameters = c(logarithmic_intensity, theta, beta=0, M=theta*log(1+Tstar))
+  
+  power = compute_power(lambda_parameters, pvalue_Laplace, Tstar, alpha=0.05, N=1e4)
+  nmean = n_mean_logarithmic(lambda_parameters, Tstar)
+  
+  powers = c(powers, power)
+  nmeans = c(nmeans, nmean)
+}
+
+cat("T* =", 10, 15, 25, "\n")
+cat("n =", nmeans, "\n")
+cat("Powers of Laplace test", powers, "\n")
+```
+```{r}
+# Weibull Test with logarithmic intensity of parameters theta = 1 and beta = 0
+
+theta = 1
+
+powers = c()
+nmeans = c()
+
+for (Tstar in c(10.0, 15.0, 25.0))
+{
+  lambda_parameters = c(logarithmic_intensity, theta, beta=0, M=theta*log(1+Tstar))
+  
+  power = compute_power(lambda_parameters, pvalue_Weibull, Tstar, alpha=0.05, N=1e4)
+  nmean = n_mean_logarithmic(lambda_parameters, Tstar)
+  
+  powers = c(powers, power)
+  nmeans = c(nmeans, nmean)
+}
+
+cat("T* =", 10, 15, 25, "\n")
+cat("n =", nmeans, "\n")
+cat("Powers of Weibull test", powers, "\n")
+```
+
+# Weibull intensity
+```{r}
+# Weibull Test with Weibull intensity of parameters theta = 1, 2, 4
+
+Tstar=2
+
+powers = c()
+nmeans = c()
+
+for (theta in c(1.0, 2.0, 4.0)) 
+{
+  lambda_parameters = c(weibull_intensity, theta, beta=0, M=theta*Tstar^(theta-1))
+  
+  power = compute_power(lambda_parameters, pvalue_Weibull, Tstar, alpha=0.05, N=1e4)
+  nmean = n_mean_Weibull(lambda_parameters, Tstar) 
+  
+  powers = c(powers, power)
+  nmeans = c(nmeans, nmean)
+}
+
+cat("Theta =", 1, 2, 4, "\n")
+cat("n =", nmeans, "\n")
+cat("Powers of Weibull test", powers, "\n")
+```
+
+```{r}
+# Laplace Test with Weibull intensity of parameters theta = 1, 2, 4
+
+Tstar=2
+
+powers = c()
+nmeans = c()
+
+for (theta in c(1.0, 2.0, 4.0)) 
+{
+  lambda_parameters = c(weibull_intensity, theta, beta=0, M=theta*Tstar^(theta-1))
+  
+  power = compute_power(lambda_parameters, pvalue_Laplace, Tstar, alpha=0.05, N=1e4)
+  nmean = n_mean_Weibull(lambda_parameters, Tstar) 
+  
+  powers = c(powers, power)
+  nmeans = c(nmeans, nmean)
+}
+
+cat("Theta =", 1, 2, 4, "\n")
+cat("n =", nmeans, "\n")
+cat("Powers of Laplace test", powers, "\n")
+```
+
+# Danish dataset
+
+```{r}
+ref_time <- as.POSIXct("1980-01-01 01:00:00")
+print(ref_time)
+number_of_days <- 365
+number_of_months <- 120
+
+diff_days <- as.numeric(difftime(times, ref_time, units = "days"))
+#diff_days <- (diff_days - min(diff_days))/number_of_days
+diff_days <- diff_days / 365
+max(diff_days)
+diff_months <- (as.numeric(difftime(times, ref_time, units = "days")) / 365.25) * 12
+
+plot(c(0, diff_days), seq(0, length(diff_days)), type="s",xlab="Ti",ylab="Number of events by time t")
+points(c(0, diff_days),rep(0, length(c(0, diff_days))),type="p",pch=16, col = "blue")
+lines(c(0, diff_days),seq(0, length(diff_days)),type="h",lty=2)
+
+plot(c(0, diff_months), seq(0, length(diff_months)), type="s",xlab="Ti",ylab="Number of events by time t")
+points(c(0, diff_months),rep(0, length(c(0, diff_months))),type="p",pch=16, col = "blue")
+lines(c(0, diff_months),seq(0, length(diff_months)),type="h",lty=2)
+```
+```{r}
+max(times)
+print(ref_time)
+```
+
+```{r}
+qqplot(x=qexp(ppoints(2167), rate=1), y=diff(diff_days), main="Exponential Q-Q Plot",
+       xlab="Theoretical Quantiles", ylab= "Your Data Quantiles")
+qqline(diff(diff_days), distribution=qexp)
+```
+
+```{r}
+pvalue=pvalue_Weibull(diff_days, Tstar = 11+3/365)
+print(pvalue)
+print(length(diff_days))
+```
+```{r}
+pvalue=pvalue_Laplace(diff_days, Tstar = 11+3/365)
+print(pvalue)
+```
+```{r}
+print(max(diff_days))
+print(11+3/365)
+```
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,3 @@
+(library
+ (name arkanoid)
+ (libraries graphics unix))

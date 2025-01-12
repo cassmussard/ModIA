@@ -1,0 +1,19 @@
+version: '3.9' # specify docker-compose version
+services: # services to run
+  api-app: # name of the first service
+    build: 
+      context: . # specify the directory of the Dockerfile
+      dockerfile: Dockerfile-api # specify the Dockerfile name
+    ports:
+      - "5000:5000" # specify port mapping
+      
+  gradio-app:
+    build:
+      context: . # specify the directory of the Dockerfile
+      dockerfile: Dockerfile-gradio # specify the Dockerfile name
+    ports:
+      - "7860:7860" # specify port mapping
+    depends_on:
+      - api-app # specify service dependencies
+
+  

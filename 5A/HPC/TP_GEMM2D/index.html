@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trace File Viewer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 20px;
+    }
+    #fileInput {
+      margin-bottom: 20px;
+    }
+    pre {
+      background-color: #f8f8f8;
+      padding: 1em;
+      border: 1px solid #ddd;
+      width: 80%;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>Trace File Viewer</h1>
+  <input type="file" id="fileInput" accept=".trace" />
+  <pre id="fileContent"></pre>
+
+  <script>
+    document.getElementById('fileInput').addEventListener('change', function(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          document.getElementById('fileContent').textContent = e.target.result;
+        };
+        reader.readAsText(file);
+      }
+    });
+  </script>
+</body>
+</html>
+

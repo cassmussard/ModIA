@@ -1,0 +1,13 @@
+gemseo[all]>=5.3.0
+gemseo-mlearning>=1.1.2
+griffe-inherited-docstrings
+mkdocs-gallery
+mkdocs-section-index
+mkdocs-literate-nav
+mkdocs-gen-files
+mkdocstrings[python]
+mkdocs-material
+mkdocs-include-markdown-plugin
+mkdocs-bibtex
+tabulate
+black

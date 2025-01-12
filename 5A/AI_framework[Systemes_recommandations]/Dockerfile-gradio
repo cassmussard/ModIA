@@ -1,0 +1,25 @@
+# Use an official Python runtime as the parent image
+FROM python:3.9.12
+# Set the working directory in the container to /app
+WORKDIR /app
+# Copy the current directory contents into the container at /app
+COPY . /app
+
+RUN pip install gdown
+# Google drive poster dataset download and their path
+RUN gdown --id '1BdCAAaWpiLlqZUr6lRPIQ3BJLiFJx_nW' --output MLP-20M.zip
+RUN gdown --id '1eidIw8tCKCPZ1-y6g9Ud8ALE9FsSlXoD' --output path.csv
+
+# ZIP size
+RUN ls -lh MLP-20M.zip
+# unzip the zip file
+RUN apt-get update && apt-get install -y unzip
+RUN unzip MLP-20M.zip || echo "Erreur lors de la décompression"
+
+# Install any needed packages specified in requirements_gradio.txt
+RUN pip install --trusted-host pypi.python.org -r requirements_gradio.txt
+# Make port 7860 available to the world outside this container
+# Gradio by default runs on port 7860
+EXPOSE 7860
+# Run the Gradio app when the container launches
+CMD ["python", "gradio_webapp.py"]

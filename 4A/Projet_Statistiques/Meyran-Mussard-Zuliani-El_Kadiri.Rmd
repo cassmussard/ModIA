@@ -1,0 +1,1649 @@
+---
+title: "Projet Statistiques"
+author: "Jonas Issam Lucas Cassandra"
+date: "2023-01-07"
+output: 
+  pdf_document :
+    toc : TRUE
+    toc_depth : 2
+    number_section : TRUE
+header-includes:
+   - \usepackage{dsfont}
+   - \usepackage{color}
+   - \newcommand{\1}{\mathds{1}}
+---
+
+```{r setup, echo=FALSE, cache=FALSE, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(fig.height=3, fig.width=4)
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               class.source="badCode")
+#opts_knit$set(width=75)
+
+library(corrplot)
+library(reticulate)
+```
+
+```{r,echo=F}
+# Importation des données sous R :
+library(FactoMineR)
+Data = read.table("donnees.txt",header=TRUE, sep=";")
+```
+
+# Introduction
+
+On observe, pour G = 1615 gènes d'une plante modèle, les valeurs suivantes : $$ Y_{gtsr}  = log_{2}(X_{gtsr} + 1) - log_{2}(X_{gt_{0}} + 1) $$ 
+où : 
+\newline
+  - $X_{gtsr}$ est la mesure du gène g pour le traitement t pour le réplicat r et au temps s.
+\newline
+  - $X_{ggt_{0}}$ est l'expression du gène g pour un traitement de référence. 
+\newline
+\newline
+On dit qu'un gène g est sur-exprimé si $Y_{gtsr} > 1$, sous-exprimé si $Y_{gtsr} < 1$ et non-exprimé sinon. 
+\newline
+Le jeu de données comprend 36 variables quantitatives.
+
+# Analyse du jeu de données
+Cette partie a été réalisée en Python dans la première partie du Jupyter notebook.
+## Réduction des données :
+
+Les données sont exprimées dans des ordres de grandeur différents. On normalise les données. 
+
+```{r, echo=FALSE}
+Data_cr = scale(Data, center = TRUE, scale=TRUE)
+Data_cr = as.data.frame(Data_cr)
+```
+
+```{r, echo=FALSE, fig.width=8, fig.height=4,fig.cap="\\label{fig:boxplot}Boxplot des traitements"}
+boxplot(Data_cr)
+```
+
+Malgré la transformation, on observe de nombreux outliers d'après la figure \ref{fig:boxplot}. En effet, dans la plupart des cas, les gènes ne sont pas exprimés, ainsi les valeurs sont concentrées autour de 0. Le boxplot est donc peu intéressant.
+
+## Analyse bi-dimensionnelle 
+
+```{r, echo=FALSE, fig.height = 3, fig.cap="\\label{fig:R12}Etat des gènes selon le traitement et le temps pour les réplicats 1 et 2", fig.width=8,}
+par(mfrow=c(1,2))
+library(ggplot2)
+Data = read.table("donnees.txt",header=TRUE, sep=";")
+MD = as.matrix(Data)
+
+# Conversion de la base de données en une matrice remplie de 1, 0 et -1.
+
+for(i in 1:1615){
+for(j in 1:36){
+val = MD[i,j]
+if(val > 1){MD[i,j] = 1}
+if(val < -1){MD[i,j] = -1}
+if(val >= -1 & val <= 1){MD[i,j] = 0}
+}
+}
+
+df_Data=as.data.frame(MD);
+
+# On réalise deux dataframe, un pour le réplica 1, l'autre pour le réplica 2
+df_R1 = df_Data[,1:18];
+df_R2 = df_Data[,19:36];
+
+# On récupère les noms formatés :
+n_R1 = attributes(df_R1)$names
+n_R1 = gsub("_R1", "", n_R1)
+n_R2 = attributes(df_R2)$names;
+n_R2 = gsub("_R2", "", n_R2)
+
+# Compter le nombre -1,0,1 :
+
+nb_R1 = c()
+nb_R2 = c()
+
+for(i in 1:18){
+nb1=sum(df_R1[,i]==1)
+nb0=sum(df_R1[,i]==-0)
+nb_1=sum(df_R1[,i]==-1)
+
+nb_R1 <- append(nb_R1, c(nb_1, nb0, nb1))
+
+nb11=sum(df_R2[,i]==1)
+nb00=sum(df_R2[,i]==-0)
+nb_11=sum(df_R2[,i]==-1)
+
+nb_R2 <- append(nb_R2, c(nb_11, nb00, nb11))
+}
+
+# Création de notre dataframe :
+
+nb_R1 <- nb_R1/1615
+nb_R2 <- nb_R2/1615
+n1_R1 = rep(n_R1, each=3)
+n2_R2 = rep(n_R2, each=3)
+
+value = as.factor(rep(c(-1,0,1), 18));
+
+df1 = data.frame(n1_R1, nb_R1, value)
+df2 = data.frame(n2_R2, nb_R2, value)
+
+# Plots :
+
+library(RColorBrewer)
+library(cowplot)
+
+d1 <- ggplot(df1, aes(fill = value, x=n1_R1,y=nb_R1)) +
+geom_bar(stat='identity') +
+theme(axis.text.x = element_text(angle=90)) +
+scale_fill_brewer(labels = c("Sous-exprimé", "Non-exprimé", "Sur-exprimé"), palette="Spectral")  +
+xlab("Configuration des gènes") +
+ylab("Proportion")
+
+
+d2 <- ggplot(df2, aes(fill = value, x=n2_R2,y=nb_R2)) +
+geom_bar(stat='identity') +
+theme(axis.text.x = element_text(angle=90)) +
+scale_fill_brewer(labels = c("Sous-exprimé", "Non-exprimé", "Sur-exprimé"), palette="Spectral") +
+xlab("Configuration des gènes") +
+ylab("Proportion")
+
+plot_grid(d1,d2)
+```
+
+D'après la figure \ref{fig:R12}, on observe que les réplicats 1 et 2 suivent les mêmes tendances (non/sous/sur-exprimé). 
+\newline
+Cependant, lorsque l’on calcule les coefficients de corrélation pour chaque traitement à chaque temps entre les réplicats 1 et 2, on constate que les valeurs prises pour le traitement 1 possèdent une forte variabilité suivant le réplicat. Au contraire, pour les traitement 2 et 3, les valeurs obtenues sont très semblables. 
+
+
+```{r, echo=FALSE, fig.cap="\\label{fig:corr}Corrélation entre les réplicats 1 et 2"}
+c = rep(0,18)
+for (i in 1:18) {
+  c[i] = cor(Data[,i],Data[,i+18])
+}
+
+tableau1 <- data.frame(c[1], c[2], c[3], c[4], c[5], c[6])
+colnames(tableau1) <- c("T1_1h","T1_2h","T1_3h","T1_4h","T1_5h","T1_6h")
+rownames(tableau1) <- c("Cor(R1,R2)")
+tableau1
+
+tableau2 <- data.frame(c[7], c[8], c[9], c[10], c[11], c[12])
+colnames(tableau2) <- c("T2_1h","T2_2h","T2_3h","T2_4h","T2_5h","T2_6h")
+rownames(tableau2) <- c("Cor(R1,R2)")
+tableau2
+
+tableau3 <- data.frame(c[13], c[14], c[15], c[16], c[17], c[18])
+colnames(tableau3) <- c("T3_1h","T3_2h","T3_3h","T3_4h","T3_5h","T3_6h")
+rownames(tableau3) <- c("Cor(R1,R2)")
+tableau3
+
+```
+
+```{r, fig.height=3, fig.width=10, echo=FALSE, fig.cap="\\label{fig:corrplot}Cercles des corrélations au sein de chaque traitement"}
+par(mfrow =c(1,3))
+corrplot(cor(Data_cr[seq(1,6)]),method="ellipse")
+corrplot(cor(Data_cr[seq(7,12)]),method="ellipse")
+corrplot(cor(Data_cr[seq(13,18)]),method="ellipse")
+```
+
+
+D'après figure \ref{fig:corrplot}, au sein des traitements 2 et 3, on observe une forte corrélation entre deux mesures successives (h et h+1). 
+
+## Analyse en composantes principales
+On fait une ACP afin de condenser l'information de notre jeu de données au travers de méta-variables. 
+
+```{r, fig.height=3, fig.width=6 ,echo=FALSE, fig.cap="\\label{fig:PCA}ACP des variables et des individus"}
+# ACP centrée réduite : les données ne sont pas à la même échelle. 
+library("factoextra")
+res.pca <- PCA(Data, scale.unit = TRUE, graph = FALSE)
+ind = plot.PCA(res.pca, axes=c(1, 2), choix="ind")
+var = plot.PCA(res.pca, axes=c(1, 2), choix="var")
+plot_grid(ind,var)
+
+# fviz_pca_var(res.pca, col.var = "black", axes=c(1,2))
+# fviz_pca_ind(res.pca, col.var = "black", axes=c(1,2), label="none")
+```
+
+D'après la figure \ref{fig:PCA}, on constate deux clusters. L'analyse en cluster sera plus longuement détaillée par la suite.  
+\newline
+Choix du nombres de composantes : 
+
+```{r, fig.height=3, fig.width=6 , echo=FALSE, fig.cap="\\label{fig:screeplot}Pourcentage de variance expliquée en fonction de la dimension"}
+fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 70))
+```
+
+On applique la méthode du coude à la figure \ref{fig:screeplot} afin de déterminer le nombre de composantes que l'on garde. On conserve uniquement les deux premières composantes soit 70.2 % de la variance expliquée. 
+\newline
+Cependant, par la suite, en expliquant les axes principaux, on constate que le 3ème semble porter une information pertinente. Ainsi, nous choisissons de garder les 3 premiers axes, soit 76.6% de la variance.
+\newline
+On exprime les trois premières dimensions en fonction des 36 variables.
+
+```{r, echo=FALSE, fig.height=3, fig.width=12, fig.cap="\\label{fig:respca}Coordonnées des composantes"}
+# res.pca$var$coord[,1:2]
+par(mfrow =c(1,3))
+plot(res.pca$var$coord[,1], type="o", xlab = "Traitements", ylab = "Composante 1")
+plot(res.pca$var$coord[,2], type="o", xlab = "Traitements", ylab = "Composante 2")
+plot(res.pca$var$coord[,3], type="o", xlab = "Traitements", ylab = "Composante 3")
+```
+
+D'après la figure \ref{fig:respca}, on remarque que les traitements T2 et T3 expliquent la composante 1 et ainsi le cluster de droite. En effet, les coefficients associés aux traitements T2 et T3 tendent vers 1 tandis que les coefficients associés au traitement T1 sont proches de 0. De la même manière, le traitement T1 explique la composante 2. Le graphique 3 est périodique de période 6.
+
+# Régression linéaire multiple
+
+Cette partie n'a pas été réalisée en Python car aucun package nous permet de faire de la sélection de variables.
+```{r, echo=FALSE}
+library(leaps)
+library(MASS)
+T3_1to6H_R2 = Data[,31:36]
+reg_multi_T3_R2 = lm(T3_6h_R2~., data=T3_1to6H_R2)
+```
+
+```{r, echo=FALSE, eval=FALSE}
+summary(reg_multi_T3_R2)
+```
+On réalise plusieurs sélections de variables avec différentes méthodes (forward et backward) pour lesquelles on applique différents critères (BIC, Cp de Mallows et AIC).
+```{r, echo=FALSE, eval=FALSE}
+choix = regsubsets(T3_6h_R2~., data=T3_1to6H_R2, nbest=1, nvmax=10, method='backward')
+plot(choix, scale='Cp')
+plot(choix, scale='bic')
+```
+```{r, echo=FALSE, eval=FALSE}
+choix = regsubsets(T3_6h_R2~., data=T3_1to6H_R2, nbest=1, nvmax=10, method='forward')
+plot(choix, scale='Cp')
+plot(choix, scale='bic')
+```
+
+```{r, echo=FALSE, eval=FALSE}
+modselect_aic_backward=stepAIC(reg_multi_T3_R2,trace=F,direction="backward")
+summary(modselect_aic_backward)
+```
+Les sélections de variables en backward/forward selon les critères BIC/Cp/AIC conduisent toutes au modèle initial. On en déduit donc que, pour le traitement 3 à 6h, toutes les heures du traitement 3 pour le réplicat 2 jouent un rôle significatif sur l'expression des gènes T3_6h_R1 . 
+
+## T3_6h_R2 en fonction de T3_ih_R1 et T3_ih_R2
+On considère maintenant le réplicat 1. 
+```{r, echo=FALSE}
+T3_1to6H_R12 = Data[,-c(1:12,19:30)]
+reg_multi_T3_R12 = lm(T3_6h_R2~., data=T3_1to6H_R12)
+```
+
+```{r, echo=FALSE, eval=FALSE}
+summary(reg_multi_T3_R12)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=14, fig.cap="\\label{fig:CpBicBac}Séléction de variables : méthodes descendantes"}
+par(mfrow =c(1,2))
+choix = regsubsets(T3_6h_R2~., data=T3_1to6H_R12, nbest=1, nvmax=10, method='backward')
+plot(choix, scale='Cp')
+plot(choix, scale='bic')
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=14, fig.cap="\\label{fig:CpBicFor}Séléction de variables : méthodes ascendantes"}
+par(mfrow =c(1,2))
+choix = regsubsets(T3_6h_R2~., data=T3_1to6H_R12, nbest=1, nvmax=10, method='forward')
+plot(choix, scale='Cp')
+plot(choix, scale='bic')
+```
+```{r, echo=FALSE, eval=FALSE}
+modselect_aic_backward=stepAIC(reg_multi_T3_R12,trace=T,direction="backward")
+summary(modselect_aic_backward)
+```
+D'après les figures \ref{fig:CpBicBac} et \ref{fig:CpBicFor}, on obtient les deux sous-modèles suivant : 
+\newline
+(M1) : $T3\_6h\_R2_i = \theta_0 + \theta_1T3\_1h\_R1_i+ \theta_2T3\_2h\_R1_i + \theta_3T3\_3h\_R1_i +\theta_4T3\_5h\_R1_i + \theta_5T3\_6h\_R2_i + \theta_6T3\_1h\_R2_i + \theta_7T3\_2h\_R2_i + \theta_8T3\_3h\_R2_i + \theta_9T3\_5h\_R2_i + \theta_{10}T3\_5h\_R2_i + \epsilon_i$
+
+(M2) : $T3\_6h\_R2_i = \theta_0 + \theta_1T3\_1h\_R1_i+ \theta_2T3\_2h\_R1_i + \theta_3T3\_3h\_R1_i +\theta_4T3\_5h\_R1_i + \theta_5T3\_6h\_R2_i + \theta_6T3\_1h\_R2_i + \theta_7T3\_3h\_R2_i + \theta_8T3\_5h\_R2_i + \theta_9T3\_5h\_R2_i + \epsilon_i$
+\newline
+On réalise deux tests de Fisher afin de valider ou non les sous-modèles précédemment établis.
+\newline
+```{r, echo=FALSE}
+reg_multi_simplifie_T3_R12 = lm(T3_6h_R2~T3_1h_R1+T3_2h_R1+T3_3h_R1+T3_5h_R1+T3_6h_R1+T3_1h_R2+T3_2h_R2+T3_3h_R2+T3_5h_R2, data=Data[,-c(1:12,19:30)])
+```
+
+```{r, echo=FALSE, eval=F}
+anova(reg_multi_simplifie_T3_R12, reg_multi_T3_R12)
+```
+Le premier test renvoie une p-valeur égale à 0.93 > 0.05. On accepte le sous-modèle (M1) au risque 5%.
+\newline
+```{r, echo=FALSE}
+reg_multi_simplifie_T3_R12 = lm(T3_6h_R2~T3_1h_R1+T3_2h_R1+T3_3h_R1+T3_5h_R1+T3_6h_R1+T3_1h_R2+T3_3h_R2+T3_5h_R2, data=Data[,-c(1:12,19:30)])
+```
+
+```{r, echo=FALSE, eval=F}
+anova(reg_multi_simplifie_T3_R12, reg_multi_T3_R12)
+```
+Le second test renvoie un p-valeur égale à 0.31 > 0.05. On accepte le sous-modèle (M2) au risque 5%.
+
+## T3_6h_R2 en fonction de Ti_jh_R2
+A présent, nous étudions l'impact de l'expression des gènes sur le traitement T1 à 6h pour tous les traitements et pour tous les temps. On ne considère que le réplicat 2 pour cette partie. 
+
+### Critère : BIC et Cp de Mallows
+
+```{r, echo=FALSE, eval=FALSE}
+reg_multi_TOT = lm(T3_6h_R2~., data=Data[,19:36])
+summary(reg_multi_TOT)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=14, fig.cap="\\label{fig:CpBicBac2}Séléction de variables : méthodes descendantes"}
+par(mfrow =c(1,2))
+choix = regsubsets(T3_6h_R2~., data=Data[,19:36], nbest=1, nvmax=10, method='backward')
+plot(choix, scale='Cp', cex.lab=0.25)
+plot(choix, scale='bic')
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=14, fig.cap="\\label{fig:CpBicFor2}Séléction de variables : méthodes ascendantes"}
+reg_multi_TOT = lm(T3_6h_R2~., data=Data[,19:36])
+choix = regsubsets(T3_6h_R2~., data=Data[,19:36], nbest=1, nvmax=10, method='forward')
+par(mfrow =c(1,2))
+plot(choix, scale='Cp', cex.lab=0.25)
+plot(choix, scale='bic')
+```
+
+On note (M1) le sous-modèle obtenue d'après la \ref{fig:CpBicBac2} avec les critères Cp et Bic en backward avec le critère Bic en forward.
+
+(M1) : $T3\_6h\_R2_i = \theta_0 + \theta_1T1\_1h\_R2_i+ \theta_2T1\_3h\_R2_i + \theta_3T1\_5h\_R2_i +\theta_4T1\_6h\_R2_i + \theta_5T2\_1h\_R2_i + \theta_6T2\_3h\_R2_i + \theta_7T2\_5h\_R2_i + \theta_8T2\_6h\_R2_i + \theta_9T3\_5h\_R2_i + \epsilon_i$
+
+On note (M2) le sous-modèle obtenue d'après la \ref{fig:CpBicFor2} avec le critère Cp en forward.
+
+
+(M2) : $T3\_6h\_R2_i = \theta_0 + \theta_1T1\_1h\_R2_i+ \theta_2T1\_3h\_R2_i + \theta_3T1\_5h\_R2_i +\theta_4T1\_6h\_R2_i +\theta_5T2\_1h\_R2_i + \theta_6T2\_2h\_R2_i + \theta_7T2\_3h\_R2_i + \theta_8T2\_5h\_R2_i + \theta_9T2\_6h\_R2_i +\theta_{10}T3\_5h\_R2_i + \epsilon_i$
+
+On réalise deux tests de Fisher afin de valider ou non les sous-modèles précédemment obtenus : 
+\newline
+```{r, echo=FALSE}
+reg_multi_simplifie_T31 = lm(T3_6h_R2~T1_1h_R2+T1_3h_R2+T1_5h_R2+T1_6h_R2+T2_1h_R2+T2_3h_R2+T2_5h_R2+T2_6h_R2+T3_5h_R2, data=Data[,19:36])
+```
+
+```{r, echo=FALSE, eval=F}
+anova(reg_multi_simplifie_T31, reg_multi_TOT)
+```
+
+```{r, echo=FALSE}
+reg_multi_simplifie_T32 = lm(T3_6h_R2~T1_1h_R2+T1_3h_R2+T1_5h_R2+T1_6h_R2+T2_1h_R2+T2_2h_R2+T2_3h_R2+T2_5h_R2+T2_6h_R2+T3_5h_R2, data=Data[,19:36])
+```
+
+```{r, echo=FALSE, eval=F}
+anova(reg_multi_simplifie_T32, reg_multi_TOT)
+```
+
+Les deux tests de Fisher renvoient une pvaleur (respectivement 0.2798 et 0.4205) supérieure à 0.05. On ne rejette pas les sous-modèles au risque 5%. 
+\newline
+Choisissons maintenant, le meilleur des deux sous-modèles. Le modèle (M1) étant inclu dans le modèle (M2), on peut réaliser de nouveau un test de sous-modèle de Fisher. 
+
+```{r, echo=FALSE, eval=F}
+anova(reg_multi_simplifie_T31, reg_multi_simplifie_T32)
+```
+Le test de Fisher renvoie une pvaleur égale à 0.09932 > 0.05. On conserve donc le modèle (M1)
+
+### Critère AIC
+Réalisons maintenant la sélection de variables avec la méthode backward et le critère AIC (la méthode forward ne fonctionne pas avec le critère AIC).
+
+La sélection de variables en backward avec le critère AIC renvoie le sous-modèle suivant : 
+```{r, echo=FALSE, eval=FALSE}
+modselect_tot_aic_backward=stepAIC(reg_multi_TOT,trace=T,direction="backward")
+summary(modselect_tot_aic_backward)
+```
+
+(M3) : $T3\_6h\_R2_i = \theta_0 + \theta_1T1\_1h\_R2_i+ \theta_2T1\_3h\_R2_i + \theta_3T1\_5h\_R2_i +\theta_4T1\_6h\_R2_i + \theta_5T2\_1h\_R2_i + \theta_6T2\_3h\_R2_i + \theta_7T2\_5h\_R2_i + \theta_8T2\_6h\_R2_i + \theta_9T3\_3h\_R2_i +  \theta_10T3\_4h\_R2_i +\theta_11T3\_5h\_R2_i + \epsilon_i$
+
+On réalise un test de Fisher afin de valider ou non le sous-modèle précédemment obtenu :
+```{r, echo=FALSE }
+mod_aic_backward = lm(T3_6h_R2~T1_1h_R2 + T1_3h_R2 + T1_5h_R2 + T1_6h_R2 + 
+    T2_1h_R2 + T2_3h_R2 + T2_5h_R2 + T2_6h_R2 + T3_3h_R2 + T3_4h_R2 + 
+    T3_5h_R2 , data=Data[,19:36])
+#summary(mod_aic_backward)
+```
+
+```{r, echo=FALSE, eval=F}
+anova(mod_aic_backward, reg_multi_TOT )
+```
+Le test renvoie un pvaleur égale à 0.4887 > 0.05. On valide le sous-modèle.
+\newline
+On ne peut pas faire un test de sous-modèle car ils ne sont pas sous-modèles l'un de l'autre. Les R2 ajustés des deux modèles étant égaux on compare la valeur du critère AIC. 
+
+```{r, echo=FALSE,eval=F}
+extractAIC(mod_aic_backward) #M3
+extractAIC(reg_multi_simplifie_T31) #M1
+```
+
+
+```{r, echo=FALSE, eval=FALSE }
+library(glmnet)
+lambda_seq=seq(0,1,0.001)
+tildeX = as.matrix(Data_cr[,19:35])
+tildeY = Data_cr[,36]
+fitlasso <- glmnet(tildeX,tildeY, alpha = 1, lambda = lambda_seq,family=c("gaussian"),intercept=F)
+lasso_cv <- cv.glmnet(tildeX, tildeY, alpha = 1, lambda = lambda_seq,nfolds=10,type.measure=c("mse"),intercept=F)
+best_lambda <-lasso_cv$lambda.min
+best_lambda.1se <- lasso_cv$lambda.1se
+plot(fitlasso)
+```
+
+## T1_6h_R2 en fonction de T1_ih_R2 
+```{r, echo=FALSE}
+library(leaps)
+library(MASS)
+T1_1h_R2 = Data[,6]
+```
+
+```{r, echo=FALSE}
+T1_1to6H_R2 = Data[,19:24]
+reg_multi_T1_R2 = lm(T1_6h_R2~., data=T1_1to6H_R2)
+#summary(reg_multi_T1_R2)
+```
+On réalise plusieurs sélections de variables avec différentes méthodes (forward et backward) pour lesquelles on applique différents critères (BIC, Cp de Mallows et AIC).
+
+```{r, echo=FALSE, fig.height=5, fig.width=14, fig.cap="\\label{fig:T1desc0}Séléction de variables : méthodes descendantes"}
+par(mfrow=c(1,2))
+choix = regsubsets(T1_6h_R2~., data=T1_1to6H_R2, nbest=1, nvmax=10, method='backward')
+plot(choix, scale='Cp')
+plot(choix, scale='bic')
+```
+
+D'après la figure \ref{fig:T1desc0}, on obtient le sous-modèle suivant :
+\newline
+(M1) : $T1\_6h\_R2_i = \theta_0 + \theta_1T1\_2h\_R2_i+ \theta_2T1\_3h\_R2_i + \theta_3T1\_4h\_R2_i + \theta_4T1\_5h\_R2_i$
+
+La sélection de variables avec la méthode ascendante revoie le même sous-modèle.
+```{r, echo=FALSE, eval=FALSE }
+choix = regsubsets(T1_6h_R2~., data=T1_1to6H_R2, nbest=1, nvmax=10, method='forward')
+plot(choix, scale='Cp')
+plot(choix, scale='bic')
+```
+On applique le critère AIC pour les sélections de variables en forward et backward :
+```{r, echo=FALSE }
+AIC_T1_backward = stepAIC(reg_multi_T1_R2,trace=F,direction="backward")
+#summary(AIC_T1_backward)
+```
+La méthode backward avec le critère AIC propose le même sous-modèle. Vérifions si ce sous modèle est acceptable. On fait un test de sous-modèle de Fisher.
+
+```{r, echo=FALSE}
+reg_simplifie_T1 = lm(T1_6h_R2~T1_2h_R2+T1_3h_R2+T1_4h_R2+T1_5h_R2, data=Data[,19:24])
+```
+```{r, echo=FALSE, eval=F}
+anova(reg_simplifie_T1, reg_multi_T1_R2)
+```
+La pvaleur est largement supérieure à 0.05. On accepte le sous-modèle (M1) au risque 5%. 
+\newline
+La méthode forward avec le critère AIC conserve toutes les variables. 
+\newline
+Finalement, les temps affectant l’expression des gènes à 6h pour le traitement T1 fixé sont les heures 2, 3, 4 et 5.
+
+## T1_6h_R2 en fonction de T1_ih_R1 etT1_ih_R2
+On considère maintenant le réplicat 1.
+
+```{r, echo=FALSE}
+T1_1to6H_R12 = Data[-c(7:18,25:36)]
+reg_multi_T1_R12 = lm(T1_6h_R2~., data=T1_1to6H_R12)
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=14, fig.cap="\\label{fig:T1asc}Séléction de variables : méthodes descendantes"}
+par(mfrow =c(1,2))
+choix = regsubsets(T1_6h_R2~., data=T1_1to6H_R12, nbest=1, nvmax=10, method='backward')
+plot(choix, scale='Cp')
+plot(choix, scale='bic')
+```
+
+```{r, echo=FALSE, fig.height=5, fig.width=14, fig.cap="\\label{fig:T1desc}Séléction de variables : méthodes ascendantes"}
+par(mfrow =c(1,2))
+choix = regsubsets(T1_6h_R2~., data=T1_1to6H_R12, nbest=1, nvmax=10, method='forward')
+plot(choix, scale='Cp')
+plot(choix, scale='bic')
+```
+
+```{r, echo=FALSE, eval=FALSE}
+modselect_aic_backward=stepAIC(reg_multi_T1_R12,trace=T,direction="backward")
+summary(modselect_aic_backward)
+```
+D'après les figures \ref{fig:T1asc} et \ref{fig:T1desc}, on obtient les deux sous-modèles suivant : 
+\newline
+(M1) : $T1\_6h\_R2_i = \theta_0 + \theta_1T1\_2h\_R1_i+ \theta_2T1\_3h\_R1_i + \theta_3T1\_4h\_R1_i +\theta_4T1\_5h\_R1_i + \theta_5T1\_6h\_R2_i + \theta_6T1\_6h\_R1_i + \theta_7T1\_1h\_R2_i + \theta_8T1\_2h\_R2_i + \theta_9T1\_3h\_R2_i + \theta_{10}T1\_4h\_R2_i + \theta_{11}T1\_5h\_R2_i + \epsilon_i$
+
+(M2) : $T1\_6h\_R2_i = \theta_0 + \theta_1T1\_2h\_R1_i+ \theta_2T1\_3h\_R1_i + \theta_3T1\_4h\_R1_i +\theta_4T1\_5h\_R1_i + \theta_5T1\_6h\_R2_i + \theta_6T1\_6h\_R1_i + \theta_7T1\_2h\_R2_i + \theta_8T1\_4h\_R2_i + \theta_9T1\_5h\_R2_i + \epsilon_i$
+\newline
+On réalise deux tests de Fisher afin de valider ou non les sous-modèles précédemment établis.
+```{r, echo=FALSE}
+reg_multi_simplifie_T1_R12 = lm(T1_6h_R2~T1_2h_R1+T1_3h_R1+T1_4h_R1+T1_5h_R1+T1_6h_R1+T1_1h_R2+T1_2h_R2+T1_3h_R2+T1_4h_R2+T1_5h_R2, data=Data[-c(7:18,25:36)])
+```
+```{r, echo=FALSE, eval=F}
+anova(reg_multi_simplifie_T1_R12, reg_multi_T1_R12)
+```
+Le test renvoie une p-valeur égale à 0.498 > 0.05. On accepte le sous-modèle (M1) au risque 5%.
+```{r, echo=FALSE}
+reg_multi_simplifie_T1_R12 = lm(T1_6h_R2~T1_2h_R1+T1_3h_R1+T1_4h_R1+T1_5h_R1+T1_6h_R1+T1_2h_R2+T1_4h_R2+T1_5h_R2, data=Data[-c(7:18,25:36)])
+```
+```{r, echo=FALSE, eval=F}
+anova(reg_multi_simplifie_T1_R12, reg_multi_T1_R12)
+```
+Le test renvoie une p-valeur égale à 0.21 < 0.05. On rejette le sous-modèle (M2) au risque 5%.
+
+## T1_6h_R2 en fonction de Ti_jh_R2 
+
+Régression linéaire multiple : T3_6h_R2 en fonction de Ti_jh_R2.
+
+```{r, echo=FALSE}
+reg_T1_tot = lm(T1_6h_R2~., data=Data[,19:36])
+#summary(reg_T1_tot)
+```
+### Critère : BIC et Cp de Mallows
+
+On fait une sélection de variables avec les méthodes forward/backward et les critères BIC/Cp de Mallows.
+
+```{r, echo=FALSE, fig.height=5, fig.width=14, fig.cap="\\label{fig:T1desc2}Séléction de variables : méthodes descendantes"}
+par(mfrow =c(1,2))
+choix_T1_backward = regsubsets(T1_6h_R2~., data=Data[,19:36], nbest=1, nvmax=10, method='backward')
+plot(choix_T1_backward, scale='Cp', cex.lab=0.25)
+plot(choix_T1_backward, scale='bic')
+```
+
+Les deux algorithmes renvoient le même sous-modèle (figure \ref{fig:T1desc2}).
+\newline
+On réalise un test de Fisher de sous-modèle :
+
+```{r, echo=FALSE}
+mod_backward_bic_T1 = lm(T1_6h_R2~T1_2h_R2+T1_3h_R2+T1_4h_R2+T1_5h_R2+T2_2h_R2+T2_3h_R2+T2_6h_R2+T3_1h_R2+T3_5h_R2+T3_6h_R2, data=Data[,19:36])
+```
+
+```{r, echo=FALSE, eval=F}
+anova(mod_backward_bic_T1,reg_T1_tot)
+```
+Le test renvoie une pvaleur très inférieure à 0.05. On rejette le sous-modèle au risque 5%.
+
+```{r, echo=FALSE, fig.height=5, fig.width=14, fig.cap="\\label{fig:T1asc2}Séléction de variables : méthodes ascendantes"}
+par(mfrow =c(1,2))
+choix_T1_forward = regsubsets(T1_6h_R2~., data=Data[,19:36], nbest=1, nvmax=10, method='forward')
+plot(choix_T1_forward, scale='Cp', cex.lab=0.25)
+plot(choix_T1_forward, scale='bic')
+```
+
+Les deux algorithmes renvoient le même sous-modèle (figure \ref{fig:T1asc2}).
+\newline
+On réalise un test de Fisher de sous-modèle :
+
+```{r, echo=FALSE}
+mod_backward_bic_T1 = lm(T1_6h_R2~T1_3h_R2+T1_4h_R2+T1_5h_R2+T2_1h_R2+T2_2h_R2+T2_3h_R2
+                         +T2_6h_R2+T3_1h_R2+T3_3h_R2+T3_5h_R2, data=Data[,19:36])
+```
+```{r, echo=FALSE, eval=F}
+anova(mod_backward_bic_T1,reg_T1_tot)
+```
+Le test renvoie une pvaleur très inférieure à 0.05. On rejette le sous-modle au risque 5%.
+
+### Critère AIC
+Réalisons maintenant la sélection de variables avec la méthode backward avec le critère AIC.
+
+```{r, echo=FALSE, eval=FALSE}
+modselect_T1_aic_backward=stepAIC(reg_T1_tot,trace=T,direction="backward")
+summary(modselect_T1_aic_backward)
+```
+On obtient le sous-modèle suivant :
+(M2) : $T1\_6h\_R2_i = \theta_0 + \theta_1T1\_1h\_R2_i+ \theta_2T1\_2h\_R2_i + \theta_3T1\_3h\_R2_i +\theta_4T1\_4h\_R2_i +\theta_5T1\_5h\_R2_i + \theta_6T2\_1h\_R2_i + \theta_7T2\_2h\_R2_i + \theta_8T2\_3h\_R2_i + \theta_9T2\_4h\_R2_i + \theta_{10}T2\_5h\_R2_i + \theta_{11}T2\_6h\_R2_i +\theta_{12}T3\_1h\_R2_i + \theta_{13}T3\_3h\_R2_i + \theta_{14}T3\_5h\_R2_i + \theta_{15}T3\_6h\_R2_i + \epsilon_i$
+
+```{r, echo=FALSE}
+mod_backward_aic_T1 = lm(T1_6h_R2~T1_1h_R2 + T1_2h_R2 + T1_3h_R2 + T1_4h_R2 + 
+    T1_5h_R2 + T2_1h_R2 + T2_2h_R2 + T2_3h_R2 + T2_4h_R2 + T2_5h_R2 + 
+    T2_6h_R2 + T3_1h_R2 + T3_3h_R2 + T3_5h_R2 + T3_6h_R2, data=Data[,19:36])
+```
+```{r, echo=FALSE,eval=F}
+anova(mod_backward_aic_T1,reg_T1_tot)
+```
+La pvaleur est supérieure à 0.05 donc on peut simplifier le modèle en enlevant le traitement 3 à 2h et 4h pour le réplicat 2 au risque 5%.
+
+# Modéle linéaire généralisé
+## Gène T3_6h_R2 :
+
+Notre objectif est de déterminer les variables prédictives permettant de discriminer les gènes sur-exprimés des gènes
+sous-exprimés à 6h pour le traitement T3 (réplicat 2). Dans le but de mettre en place une régression logistique, nous faisons le choix de modifier les valeurs prises par la variable T3_6H_R2 afin d'obtenir une réponse binaire (i représentant le i-ème gène). On supprime les gènes non exprimés de notre dataframe. On a alors : 
+
+$$
+T3\_6h\_R2_i = \left\{
+    \begin{array}{ll}
+        1 & \mbox{si } T3\_6h\_R2_i > 1 \\
+        0 & \mbox{si } T3\_6h\_R2_i < -1
+    \end{array}
+\right.
+$$
+
+```{r,echo=F}
+library(FactoMineR)
+Data = read.table("donnees.txt",header=TRUE, sep=";")
+MDGT3 = as.matrix(Data)
+
+for(i in 1:1615){
+  val <- MDGT3[i, 36]
+  if (val > 1){
+    MDGT3[i, 36] <- 1
+  }else if (val < -1){
+    MDGT3[i, 36] <- 0
+  }else{
+    MDGT3[i, ] <- MDGT3[-i,]
+  }
+}
+```
+
+Nous étudions à présent le modèle linéaire généralisé suivant : 
+
+$$
+\left\{
+    \begin{array}{ll}
+      T3\_6h\_R2_i & \sim \mathcal{B(\pi_i)} \\
+      T3\_6h\_R2_i & indépendants \\
+      logit(\pi_{i}) & = ln(\frac{\pi_{i}}{1-\pi_{i}}) \\
+      & = \theta_0 + \theta_1T3\_1h\_R2_i+ \theta_2T3\_2h\_R2_i + \theta_3T3\_3h\_R2_i
++ \theta_4T3\_4h\_R2_i + \theta_5T3\_5h\_R2_i \\
+    \end{array}
+\right.
+$$
+
+```{r,echo=F}
+Data_T3 = as.data.frame(MDGT3[, 31:36])
+glm_full <- glm(T3_6h_R2 ~ ., data= Data_T3, family=binomial(link="logit"))
+```
+```{r,echo=F, eval=F}
+summary(glm_full)
+```
+A la vue des p-valeurs, ils semblent possible de simplifier le modèle en retirant certaines variables au risque 5%. Pour se faire, on met en place un algorithme de sélection de variables basé sur le critère BIC puis AIC (forward et backward) et donc sur une minimisation de la divergence de Kullback-Leibler.
+
+```{r,echo=F}
+library(bestglm)
+library(leaps)
+library(MASS)
+```
+Critère BIC : 
+```{r,echo=F}
+modelBIC <- (bestglm(Data_T3,family=binomial,IC="BIC"))$BestModel; modelBIC
+```
+Critère AIC, méthode descendante : 
+```{r,echo=F}
+modelAIC_backward <- stepAIC(glm_full, direction=c("backward"),p=log(nrow(Default)),trace=0); modelAIC_backward
+```
+Les deux critères de sélection conduisent au même sous-modèle : 
+$$ logit(\pi_{i}) = \theta_0 + \theta_1T3\_2h\_R2_i + \theta_2T3\_5h\_R2_i $$
+Afin de valider la procédure de sélection de variables, on réalise un test de sous-modèle de Fisher. On vérifie en amont que le modèle obtenu après la sélection de variables est bien un sous-modèle du modèle initial.
+```{r,echo=F}
+glm_best <- glm(T3_6h_R2 ~ T3_2h_R2 + T3_5h_R2, data= Data_T3, family=binomial(link="logit"))
+```
+```{r,echo=F, eval=F}
+glm_best <- glm(T3_6h_R2 ~ T3_2h_R2 + T3_5h_R2, data= Data_T3, family=binomial(link="logit"))
+anova(glm_best, glm_full,test="Chisq")
+#anova(glm_best, glm_full,test="LRT")
+```
+
+Le test renvoie une p-valeur de 0.8555 : on ne rejette donc pas notre sous-modèle au risque 5%. Nous conservons alors le modèle obtenu après la sélection de variables. 
+\newline
+Nous souhaitons à présent savoir quelle variable entre T3\_2h\_R2 et T3\_5h\_R2 a la plus grande influence sur le fait que le gène $T3\_6h\_R2_i$ soit sur-exprimé ou sous-exprimé. Pour cela on s'intéresse à la notion d'odds ratio. On définit deux individus x et $\tilde{x}$ qui différent uniquement sur la variable T3\_5h\_R2 de la façon suivante: $T3\_5h\_R2(\tilde{x}) = T3\_5h\_R2(x) + 1$. On a :
+\begin{align*}
+OR(\tilde{x}, x) & = \frac{odds(\tilde{x})}{odds(x)} \\
+ & = \frac{e^{\theta_0 + \theta_1T3\_2h\_R2(\tilde{x}) + \theta_2T3\_5h\_R2(\tilde{x})}}{e^{\theta_0 + \theta_1T3\_2h\_R2(x) + \theta_2T3\_5h\_R2(x)}} \\
+ & = e^{\theta_2(T3\_2h\_R2(\tilde{x}) - T3\_5h\_R2(x))} \\
+ & = e^{\theta_2}
+\end{align*}
+
+
+```{r,echo=F, tidy=TRUE}
+exp(glm_best$coefficients)
+```
+On remarque donc que : $e^{\hat{\theta_2}^{Obs}} \approx 4104$. 
+\newline
+Cela signifie, que lorsque l'on augmente d'une unité la mesure d'expression d'un gène pour le traitement 3 à 5 heure pour le réplicat 2, on multiplie le rapport de chance de sur-expression par 4104. Nous en déduisons donc, pour le traitement 3, que le phénomène de sur-expression du gène se fait dans les derniers instants du traitement.
+\newline
+
+Nous nous demandons à présent, quelle serait la réponse prédite pour un nouveau gène et ainsi si notre sous-modèle est bien ajusté.
+\newline
+Pour cela, nous rappelons que la probabilité pour un nouveau gène d'être sur-exprimé s'écrit de la façon suivante : $$\hat{\pi_0} = \frac{e^{\theta_0 + \theta_1T3\_2h\_R2(x) + \theta_2T3\_5h\_R2(x)}}{ 1 + e^{\theta_0 + \theta_1T3\_2h\_R2(x) + \theta_2T3\_5h\_R2(x)}}$$
+La réponse prédite d'un nouveau gène s'écrit : $\mathbb{1}_{\hat{\pi_i}>0.5}$. Pour cela, nous étudions la table de contingence suivante : 
+
+```{r,echo=F, tidy=TRUE}
+hatpi <- glm_best$fitted.values
+table_best <- table(Data_T3[, 6],hatpi>0.5); table_best
+```
+Nous observons que seulement 2 individus ont été mal classés par notre sous-modèle sur l'ensemble des gènes, ce qui est très satisfaisant.
+
+
+
+
+
+## Gène T1_6h_R2 :
+On cherche maintenant à déterminer les variables prédictives permettant de discriminer les gènes sur-exprimés des gènes sous-exprimés des gènes non-exprimés à 6h pour le traitement T1 (réplicat 2). 
+Précédemment, nous nous sommes placés dans le cadre d'une régression logistique car la variable à expliquer ne prennait que deux valeurs. Ici, nous pouvons distinguer 3 plages de valeurs pour la variable T1_6h_R2.
+\newline
+\newline
+Dans un premier temps, nous décidons de nous placer dans le cadre d'un \underline{modèle de régression polytomique ordonnée} dont la dernière modalité est prise comme référence : le fait que le gène soit sur-exprimé. Pour rentrer dans ce cadre là, nous modifions les valeurs prises par la variable T1_6h_R2 de la façon suivante:
+
+$$
+T1\_6h\_R2_i = \left\{
+    \begin{array}{ll}
+        -1 & \mbox{si } T3\_6h\_R2_i < -1 \\
+        0 & \mbox{si } T3\_6h\_R2_i \in [-1,1] \\
+        1 & \mbox{si } T3\_6h\_R2_i > 1 
+    \end{array}
+\right.
+$$
+```{r,echo=F}
+Data = read.table("donnees.txt",header=TRUE, sep=";")
+MDGT1 = as.matrix(Data)
+
+for(i in 1:1615){
+  val <- MDGT1[i, 24]
+  if (val > 1){
+    MDGT1[i, 24] <- 1
+  }else if (val < -1){
+    MDGT1[i, 24] <- -1
+  }else{
+    MDGT1[i, 24] <- 0
+  }
+}
+```
+
+```{r,echo=F,}
+library("VGAM")
+Data_T1 = as.data.frame(MDGT1[, 19:24])
+modelnonord <-vglm(T1_6h_R2 ~ ., data = Data_T1, family = multinomial)
+```
+
+```{r,echo=F,eval=F}
+summary(modelnonord)
+```
+
+Le modèle s'écrit sous la forme : $$ln(\frac{\pi_m(x_i)}{\pi_1(x_i)}) = x_i\theta^{(m)}$$  
+$\pi_m$ est la probabilité de prendre la mobilité m pour les trois niveaux d'expression des génes. $x_i$ est le vecteurs des valeurs observées pour le ième individu sur les variables explicatives $\theta^{(m)} \in \mathbb{R}^{12}$
+\newline
+Comme les modalités d'expression des génes ont un ordre naturel, il est préférable de considérer un modèle reliant les $\pi_m$ pour deux modalités successives. 
+```{r,echo=F}
+# transformation en variable ordinale
+Data_T1$T1_6h_R2 = factor(Data_T1$T1_6h_R2, order = TRUE, levels = c("-1", "0", "1"))
+# ajustement du modèle
+modelord <- vglm(T1_6h_R2 ~ ., data = Data_T1, family = acat())
+```
+
+```{r,echo=F,eval=FALSE}
+summary(modelord)
+```
+Le modéle ordonné s'écrit sous la forme : $ln[\frac{\pi_{m+1}(x_i)}{\pi_{m}(x_i)}]$
+\newline
+Ainsi, pour deux individus $x$ et $\tilde{x}$ qui diffèrent d'une unité pour la variable j, on a : 
+\newline
+$OR(Y=u_{m+1}$ vs $Y = u_{m}; x,$ $\tilde{x})$ = exp $[\theta_j^{(m)}]$
+\newline
+On regarde les valeurs des coefficients les plus élevés dans le summary du modèle ordonné.
+\newline
+Pour la variable T1_4h_R2, on a :
+\newline
+$OR(Y=1$ vs $Y = 0; x,$ $\tilde{x})$ = exp $[\theta_8^{(0)^{obs}}]$ = exp(2.48761) = 12.03.
+Ainsi, le rapport de chance que le gène T1_4h_R2 soit sur-exprimé que non-exprimé est multiplié par 12.03.
+\newline
+De même, on a pour la variable T1_5h_R2 :
+\newline
+$OR(Y=0$ vs $Y = -1; x,$ $\tilde{x})$ = exp $[\theta_9^{(-1)^{obs}}]$ = exp(2.76819) = 15.92.
+Ainsi, le rapport de chance que le gène T1_5h_R2 soit non-exprimé que sous-exprimé est multiplié par 15.92.
+
+
+# Clustering des gènes
+
+Dans cette partie nous allons traiter de la partie sur le clustering des gènes. La même chose à été réalisé en Python dans la partie Clustering des données (gènes). Nous avons utilisé plusieurs méthodes pour réaliser cela (Kmeans, DBSCAN, classification hiérarchique, modèle de mélanges gaussiens). Pour l' algorithme des Kmeans nous avons utilisé des variantes de l'algorithme classique et pour la classification hiérarchique nous avons testé différentes mesures d'agrégation pour la distance euclidienne. Nous ne présentons pas toutes les méthodes utilisées mais vous pouvez vous référer au code pour les consulter.
+\newline
+Nous avons raisonné de la même manière pour tous les algorithmes. Dans un premier temps nous avons choisit le nombre de classes optimal avec différents critères (Inertie intra-classe, silhouette, Calinski-Harabasz). Nous sélectionnons le nombre de classe optimal puis nous réalisons la classification. Nous affichons la table de contingence puis nous calculons le ARI pour comparer nos méthodes. 
+
+
+
+```{r,echo=F, error=F,warning=F}
+## Pour faire le TP
+library(mclust)
+library(cluster)
+library(factoextra)
+library(FactoMineR)
+library(ppclust)
+library(reticulate)
+library(ggplot2)
+library(reshape)
+library(corrplot)
+library(gridExtra)
+library(circlize)
+library(viridis)
+library(reshape2)
+```
+## Kmeans
+
+Nous allons dans un premier temps nous intéresser à l'algorithme des Kmeans. Nous avons utilisé l'algorithme classique, l'algorithme des centres mobiles, des nuées dynamiques, PAM et fuzzy c-means.\newline
+Nous choisissons dans un premier temps le nombre de classes avec les critères d'inertie intra-classe et silhouette.
+
+```{r, echo=F, fig.show='hide'}
+fviz_nbclust(Data_cr, FUN = kmeans, method = "wss") +
+  geom_vline(xintercept = 2, linetype = 2) + 
+  labs(subtitle = "Elbow method") 
+```
+
+```{r, echo=F, fig.cap="\\label{fig:silh_kmeans_genes}Critère Silhouette pour l'algorithme Kmeans", fig.align='center'}
+
+Silhou<-NULL
+Kmax<-15
+reskmeanscl<-matrix(0,nrow=nrow(Data_cr),ncol=Kmax-1)
+for (k in 2:Kmax){
+  resaux<-kmeans(Data_cr, centers = k)
+  reskmeanscl[,k-1]<-resaux$cluster
+  aux<-silhouette(reskmeanscl[,k-1], daisy(Data_cr))
+  Silhou<-c(Silhou,mean(aux[,3]))
+}
+
+
+res_silhouette1=fviz_nbclust(Data_cr, kmeans, method = "silhouette")
+aux<-silhouette(kmeans(Data_cr, centers = 2)$cluster,dist(Data_cr))
+res_silhouette2=fviz_silhouette(aux)+theme(plot.title = element_text(size =9))
+grid.arrange(res_silhouette1,res_silhouette2,nrow=2,ncol=2)
+```
+Les deux critères nous permettent de choisir $K=2$ classes. Avec le graphique obtenu (figure \ref{fig:silh_kmeans_genes}) avec le critère silhouette nous voyons que certains points sont assez éloignés de leur centre de gravité. 
+
+
+Nous réalisons maintenant un algorithme Kmeans (MacQueen) avec 2 classes. 
+
+```{r,echo=FALSE, fig.show='hide', include=FALSE}
+
+reskmeans<- kmeans(Data_cr, 2, nstart = 25, algorithm = "MacQueen")
+fviz_cluster(reskmeans, data = Data,
+             palette = c("#2E9FDF", "#00AFBB"), 
+             geom = "point",
+             ellipse.type = "convex", 
+             ggtheme = theme_bw()
+             )
+```
+
+```{r,echo=FALSE, fig.show='hide', include=FALSE}
+
+reskmeans_Forgy<- kmeans(Data_cr, 2, nstart = 25, algorithm = "Forgy")
+fviz_cluster(reskmeans_Forgy, data = Data,
+             palette = c("#2E9FDF", "#00AFBB"), 
+             geom = "point",
+             ellipse.type = "convex", 
+             ggtheme = theme_bw()
+             )
+```
+
+```{r, echo=FALSE, fig.show='hide', include=FALSE}
+
+reskmeans_nuees<- kmeans(Data_cr, 2, nstart = 25)
+fviz_cluster(reskmeans_nuees, data = Data,
+             palette = c("#2E9FDF", "#00AFBB"), 
+             geom = "point",
+             ellipse.type = "convex", 
+             ggtheme = theme_bw()
+             )
+```
+
+
+```{r,echo=FALSE, fig.show='hide', include=FALSE}
+# A COMPLETER
+resPAM<-pam(Data_cr, k=2)
+resPAM$medoids
+resPAM$id.med
+fviz_cluster(resPAM,data=Data,ellipse.type="norm",labelsize=8,geom=c("point"))+ggtitle("")
+```
+
+```{r,echo=F}
+# A COMPLETER
+library(ppclust)
+resfcm<-fcm(Data_cr, centers=2)
+```
+
+```{r,echo=F, fig.show='hide'}
+res.fcm2 <- ppclust2(resfcm, "kmeans")
+factoextra::fviz_cluster(res.fcm2, data = Data_cr, 
+  ellipse.type = "convex",
+  palette = "jco",
+  repel = TRUE)
+```
+
+
+```{r, echo=F, include=FALSE}
+#Algorithme McQueen et Forgy : 
+library(fossil)
+adjustedRandIndex(reskmeans$cluster, reskmeans_Forgy$cluster) #Algorithme McQuenn et Forgy
+```
+
+```{r, echo=F, include=FALSE}
+#Algorithme McQueen et les nuées dynamiques : 
+adjustedRandIndex(reskmeans$cluster, reskmeans_nuees$cluster)
+```
+
+
+```{r, echo=F, include=FALSE}
+#Algorithme McQueen et PAM 
+
+adjustedRandIndex(reskmeans$cluster, resPAM$cluster)
+```
+
+
+```{r, echo=F, include=FALSE}
+#Algorithme McQueen et fuzzy c-means :
+adjustedRandIndex(reskmeans$cluster, resfcm$cluster)
+```
+Nous avons observé que tous les algorithmes donnaient le même résultat sauf l'algorithme PAM (même si nous avons presque la même classification). 
+
+Pour finir on regarde le nombre d'individus obtenu par cluster.
+```{r}
+table(reskmeans$cluster)
+```
+On remarque que les clusters ne sont pas disproportionnés, on obtient à peu près le même nombre d'individus dans les deux groupes.
+
+
+```{r, echo=F}
+library(clusterSim)
+library(factoextra)
+library(FactoMineR)
+library(reticulate)
+library(ggplot2)
+library(reshape2)
+library(circlize)
+library(viridis)
+library(dbscan)
+```
+## Méthodes hiérarchique 
+
+Nous allons maintenant voir dans un second temps le clustering des gènes avec les méthodes hérarchiques.
+
+Nous avons réalisé une classification hiérarchique avec la distance euclidienne et les mesures d'agrégation single, complete, average et Ward: 
+```{r,echo=F}
+hclustsingle<-hclust(dist(Data_cr), method="single")
+```
+
+```{r, echo=F}
+hclustcomplete<-hclust(dist(Data_cr), method="complete")
+```
+
+```{r, echo=F}
+hclustaverage<-hclust(dist(Data_cr), method="average")
+```
+
+```{r,echo=F}
+hward<-hclust(dist(Data_cr),method="ward.D2")
+```
+
+Pour la classification hiérarchique le choix du nombre de classes peut aussi se faire avec les critères Inertie intra classe et Calinski-Halbraz. 
+On réalise ces critères pour les 4 mesures d'agrégation précédemment utilisées.
+
+```{r,echo=F, fig.show='hide'}
+Kmax =10
+CH=NULL
+for (k in 2:Kmax){
+  CH= c(CH, index.G1(Data_cr,cutree(hclustsingle,k)))
+}
+d = data.frame(NBClust=2:Kmax, CH=CH)
+ggplot(d, aes(x=NBClust,y=CH))+geom_line()+geom_point()
+```
+
+```{r,echo=F, fig.show='hide'}
+Kmax =15
+silhouette=NULL
+for (k in 1:Kmax){
+  silhouette= c(silhouette, index.S(dist(Data_cr),cutree(hclustsingle,k)))
+}
+d = data.frame(NBClust=1:Kmax, CH=silhouette)
+ggplot(d, aes(x=NBClust,y=silhouette))+geom_line()+geom_point()
+```
+
+```{r,echo=F, include=FALSE}
+Class_single_3_classes = cutree(hclustsingle, k=3)
+Class_single_2_classes = cutree(hclustsingle, k=2)
+```
+
+```{r, echo=F, include=FALSE}
+table(Class_single_3_classes)
+table(Class_single_2_classes)
+```
+
+```{r,echo=F, fig.show='hide'}
+Kmax =10
+CH=NULL
+for (k in 2:Kmax){
+  CH= c(CH, index.G1(Data_cr,cutree(hclustaverage,k)))
+}
+d = data.frame(NBClust=2:Kmax, CH=CH)
+ggplot(d, aes(x=NBClust,y=CH))+geom_line()+geom_point()
+```
+
+```{r,echo=F, fig.show='hide'}
+Kmax =15
+silhouette=NULL
+for (k in 1:Kmax){
+  silhouette= c(silhouette, index.S(dist(Data_cr),cutree(hclustaverage,k)))
+}
+d = data.frame(NBClust=1:Kmax, CH=silhouette)
+ggplot(d, aes(x=NBClust,y=silhouette))+geom_line()+geom_point()
+```
+
+```{r,echo=F, include=FALSE}
+Class_average_5_classes = cutree(hclustaverage, k=5)
+Class_average_2_classes = cutree(hclustaverage, k=2)
+```
+
+```{r, echo=F, include=FALSE}
+table(Class_average_5_classes)
+table(Class_average_2_classes)
+```
+
+```{r,echo=F, fig.show='hide', include=FALSE}
+Kmax =10
+CH=NULL
+for (k in 2:Kmax){
+  CH= c(CH, index.G1(Data_cr,cutree(hclustcomplete,k)))
+}
+d = data.frame(NBClust=2:Kmax, CH=CH)
+ggplot(d, aes(x=NBClust,y=CH))+geom_line()+geom_point()
+```
+
+```{r,echo=F, fig.show='hide'}
+Kmax =15
+silhouette=NULL
+for (k in 1:Kmax){
+  silhouette= c(silhouette, index.S(dist(Data_cr),cutree(hclustcomplete,k)))
+}
+d = data.frame(NBClust=1:Kmax, CH=silhouette)
+ggplot(d, aes(x=NBClust,y=silhouette))+geom_line()+geom_point()
+```
+
+```{r,echo=F, include=FALSE}
+Class_complete_5_classes = cutree(hclustcomplete, k=6)
+Class_complete_2_classes = cutree(hclustcomplete, k=2)
+```
+
+```{r, echo=F, include=FALSE}
+table(Class_complete_5_classes)
+table(Class_complete_2_classes)
+```
+
+
+```{r,echo=F, fig.cap="\\label{fig:inertie_intra_hierarchique}Inertie intra-classe pour la mesure d'agrégation Ward", fig.align='center'}
+Kmax =10
+CH=NULL
+for (k in 2:Kmax){
+  CH= c(CH, index.G1(Data_cr,cutree(hward,k)))
+}
+d = data.frame(NBClust=2:Kmax, CH=CH)
+ggplot(d, aes(x=NBClust,y=CH))+geom_line()+geom_point()
+```
+
+```{r,echo=F, fig.show='hide'}
+Kmax =15
+silhouette=NULL
+for (k in 1:Kmax){
+  silhouette= c(silhouette, index.S(dist(Data_cr),cutree(hward,k)))
+}
+d = data.frame(NBClust=1:Kmax, CH=silhouette)
+ggplot(d, aes(x=NBClust,y=silhouette))+geom_line()+geom_point()
+```
+Pour la mesure d'agrégation ward nous obtenons 2 classes pour chacun des critères.
+```{r,echo=F}
+Class_ward_2_classes = cutree(hward, k=2)
+```
+
+```{r}
+table(Class_ward_2_classes)
+```
+Nous avons remarqué que les critères CH et Silhouette ne donnaient pas le même nombre de classe entre les mesures d'agrégation single, average et complete. De plus, en observant la table de contingence nous voyons que pour ces 3 mesures d'agrégations le nombre d'individus par classe est disproportionné.
+Par contre pour la mesure de Ward nous obtenons une classification en 2 classes et le nombre d'individus par classe est assez similaire. 
+
+```{r, echo=F,include=FALSE}
+adjustedRandIndex(Class_average_2_classes, Class_complete_2_classes)
+```
+```{r, echo=F, include=FALSE}
+adjustedRandIndex(Class_average_2_classes, Class_ward_2_classes)
+```
+```{r, echo=F, include=FALSE}
+adjustedRandIndex(Class_average_2_classes, Class_single_2_classes)
+```
+
+```{r, echo=F, include=FALSE}
+adjustedRandIndex(Class_average_2_classes, reskmeans$cluster)
+```
+```{r, echo=F, include=FALSE}
+adjustedRandIndex(Class_single_2_classes, reskmeans$cluster)
+```
+```{r, echo=F, include=FALSE}
+adjustedRandIndex(Class_complete_2_classes, reskmeans$cluster)
+```
+```{r}
+adjustedRandIndex(Class_ward_2_classes, reskmeans$cluster)
+```
+Nous avons voulu confirmer le fait que la mesure d'agrégation de ward donne une meilleure classification. Pour cela, nous avons calculé le ARI entre chacune des mesures d'agrégation et aussi avec l'algorithme des Kmeans.
+Nous remarquons que la classification obtenue avec la mesure de Ward et l'algorithme des Kmeans est similaire. Par contre, pour les autres mesures nous avons une classification totalement différente.
+
+## DBSCAN 
+
+
+
+Nous allons maintenant utiliser un autre algorithme appelé DBSCAN. En Python, nous réalisons la classification sur les données après ACP en prenant les deux premières composantes, et nous obtenons la même classification. \newline
+
+On trace pour plusieurs valeurs de minPts et de epsilon le nombre de clusters obtenus en utilisant l'algorithme DBSCAN.
+```{r,echo=F, fig.cap="\\label{fig:dbscan}Epsilon en fonction du nombre de clusters", fig.align='center'}
+minPts <- seq(5,15,1)
+eps <- seq(0.5,2,0.1)
+NBCluster <- matrix(0,nrow=length(minPts),ncol=length(eps))
+NBNonCl <-matrix(0,nrow=length(minPts),ncol=length(eps))
+for (i in 1:length(minPts)){
+  for (j in 1:length(eps)){
+    res<-dbscan::dbscan(Data_cr, eps=eps[j], minPts=minPts[i])
+    NBCluster[i,j] <- length(table(res$cluster))-1
+    NBNonCl[i,j] <- sum(res$cluster==0)
+  }
+}
+
+df<-data.frame(eps=rep(eps,each=length(minPts)),
+              minPts=as.factor(rep(minPts,length(eps))),
+              NBCluster=c(NBCluster),
+              NBNonCl=c(NBNonCl)*100/nrow(Data))
+
+ggplot(df,aes(x=eps,y=NBCluster,col=minPts))+geom_point()+geom_line()
+ggplot(df,aes(x=eps,y=NBNonCl,col=minPts))+geom_point()+geom_line()
+```
+Avec ce graphique on voit que le nombre de cluster reste a peu près le même pour plusieurs valeurs de epsilon et minPts.
+
+Nous réalisons maintenant l'algorithme DBSCAN avec MinPts=5 et eps=4. D'après le cours il faudrait prendre minPts tel que $K=ln(p)$ ou $K=p-1$ avec $p$ le nombre de colonnes. Nous prenons alors $minPts=8$. Nous obtenons $eps=5$ en traçant les 7-NN voisins (figure  \ref{fig:knn}). En faisant varier le paramètre $minPts$ nous voyons que la classfification reste la même si $5<minPts<15$.
+Cependant, si on regarde la table de contingence on voit que les individus sont répartis dans un cluster et seulement 73 ne sont pas classés. 
+```{r}
+res.db <- dbscan::dbscan(Data_cr, eps = 5, minPts=15)
+table(res.db$cluster)
+```
+
+```{r,echo=F, fig.cap="\\label{fig:knn}7 plus proches voisins", fig.align='center'}
+
+dbscan::kNNdistplot(Data_cr, minPts=8)
+abline(h = 5, lty = 2)
+```
+
+
+
+```{r,echo=F, fig.show='hide'}
+fviz_cluster(res.db, Data_cr, geom="point",ellipse="FALSE")+
+  theme(legend.position="none")+
+  xlab("")+ylab("")+ggtitle("DBSCAN")
+```
+Comparons nos résultats avec les 2 autres types d'algorithme utilisés avant (Kmeans et classification hiérarchique).
+
+Avec la classification hiérarchique : 
+```{r}
+adjustedRandIndex(Class_average_2_classes, res.db$cluster)
+```
+Avec l'algorithme des Kmeans : 
+```{r}
+adjustedRandIndex(reskmeans$cluster, res.db$cluster)
+```
+Les classifications DBSCAN Kmeans et classification hiérarchique sont très différentes car le ARI est proche de 0.
+
+## Modèle de mélanges gaussiens
+Nous allons maintenant voir dans un dernier temps l'algortihme de mélange gaussien. Ici, nous ne faisons pas l'algorithme sur les données centrées réduites contrairement aux autres algorithmes. En Python, pour cette partie nous avons en plus investigué la fusion des classes. \newline
+```{r, echo=F}
+library(ggplot2)
+library(gridExtra)
+library(FactoMineR)
+library(factoextra)
+library(reticulate)
+library(reshape2)
+library(mclust)
+```
+
+
+```{r, echo=F, include=FALSE}
+#La ligne de code suivante peut-être assez longue a s'exécuter ...
+Modele_melange<-Mclust(Data, G=2:15)
+summary(Modele_melange)
+```
+
+Les critères BIC et ICL nous permettent de choisir le nombre de cluster et la collection de modèle adaptée. Ils sélectionnent tous les deux la forme VVE avec 10 clusters. 
+
+```{r,echo=F}
+fviz_mclust(Modele_melange,what="BIC")
+summary(Modele_melange)
+```
+
+```{r, echo=F, fig.show='hide'}
+fviz_cluster(Modele_melange)
+table(Modele_melange$classification)
+```
+
+
+```{r,eval=F, include=FALSE}
+resICL<-mclustICL(Data,G=2:15)
+summary(resICL)
+```
+
+```{r, echo=F, include=FALSE}
+table(Modele_melange$classification)
+```
+
+Analysons les probabilités a priori obtenues (figure \ref{fig:proba_genes}) :
+
+```{r, echo=F,  fig.cap="\\label{fig:proba_genes}Probabilité à priori", fig.align='center'}
+Aux <- data.frame(label = paste("Cl", Modele_melange$classification, sep = ""), proba = apply(Modele_melange$z,
+    1, max))
+h1 <- ggplot(Aux, aes(x = label, y = proba)) + geom_boxplot()
+h2 <- fviz_cluster(Modele_melange, data = Data, ellipse = F, geom = "point") + ggtitle("") +
+    theme(legend.position = "none")
+grid.arrange(h1, h2, ncol = 2)
+```
+Nous voyons que les probabilités a priori sont assez mauvaises. En effet, nous observons beaucoup d'outliers par classe ce qui se traduit par une mauvaise classification de ces points. En regardant, le graphique de droite de la figure \ref{fig:proba_genes} nous voyons que beaucoup de clusters sont mélangés et peuvent donc expliquer ces mauvaises probabilités à priori.
+
+```{r}
+adjustedRandIndex(Modele_melange$classification, reskmeans$cluster)
+```
+
+```{r, echo=F, include=FALSE}
+adjustedRandIndex(Modele_melange$classification, res.db$cluster)
+```
+```{r, echo=F, include=FALSE}
+adjustedRandIndex(Modele_melange$classification, Class_average_2_classes)
+```
+
+En comparant le ARI avec les autres algorithmes utilisés nous voyons que la classification obtenue est aussi assez éloignée de celle obtenue avec les algorithmes Kmeans et classification hiérarchique avec mesure d'agrégation de Ward.
+
+En conclusion, nous avons vu que les algorithmes Kmeans et classification hiérarchique avec mesure de Ward permettent d'obtenir la meilleure classification en 2 clusters. 
+
+
+## Interpréation des clusters obtenus
+
+```{r, include=FALSE, echo=F}
+library(stats)
+df = as.data.frame(Data) # matrix => dataframe, Bien prendre Data et pas Data_cr
+df['class']<- reskmeans$cluster # Ajout colonne labels
+average_per_class = aggregate(df, list(df$class), FUN=mean)
+print(average_per_class)
+```
+Nous n'avons pas réussi à reproduire cette partie en R mais vous pouvez vous référer au Jupyter notebook sur la partie Interpretation des clusters (Kmeans).
+Nous remarquons que la moyenne d'expression des gènes du cluster 1 est quasiment toujours positive, et correspond à l'opposée de celle du cluster 2. On a donc des gènes sur-exprimés dans le cluster 1, et sous-exprimés dans cluster 2.
+
+## LDA
+
+Dans cette partie nous allons, à l'aide d'une LDA, interpréter les 2 clusters obtenus en fonction des traitements.
+
+```{r, echo=F, include=FALSE}
+X_kmeans = cbind(reskmeans$cluster,Data)
+X_DBSCAN = cbind(res.db$cluster,Data)
+X_hierarchique = cbind(Class_ward_2_classes,Data)
+X_modele_melange = cbind(Modele_melange$classification,Data)
+```
+
+```{r, echo=F, include=FALSE}
+n=nrow(X_kmeans)
+sample = sample(1:n,n)
+
+data_eval_Kmeans = X_kmeans[sample,]
+data_eval_DBSCAN = X_DBSCAN[sample,]
+data_eval_hierarchique= X_hierarchique[sample,]
+data_eval_modele_melange = X_modele_melange[sample,]
+
+
+partition_kmeans = sample(2,nrow(data_eval_Kmeans),replace=TRUE,prob=c(0.8,0.2))
+partition_DBSCAN = sample(2,nrow(data_eval_DBSCAN),replace=TRUE,prob=c(0.8,0.2))
+partition_hierarchique = sample(2,nrow(data_eval_hierarchique),replace=TRUE,prob=c(0.8,0.2))
+partition_modele_melange= sample(2,nrow(data_eval_modele_melange),replace=TRUE,prob=c(0.8,0.2))
+
+#train/test
+data_train_kmeans = data_eval_Kmeans[partition_kmeans==1,]
+data_train_DBSCAN = data_eval_DBSCAN[partition_DBSCAN==1,]
+data_train_hierarchique = data_eval_hierarchique[partition_hierarchique==1,]
+data_train_modele_melange = data_eval_modele_melange[partition_modele_melange==1,]
+
+
+data_test_kmeans = data_eval_Kmeans[partition_kmeans==2,]
+data_test_DBSCAN = data_eval_DBSCAN[partition_DBSCAN==2,]
+data_test_hierarchique = data_eval_hierarchique[partition_hierarchique==2,]
+data_test_modele_melange = data_eval_modele_melange[partition_modele_melange==2,]
+
+
+res_lda_bis_kmeans = lda(data_train_kmeans[,2:36], grouping=data_train_kmeans[,1])
+res_lda_bis_DBSCAN = lda(data_train_DBSCAN[,2:36], grouping=data_train_DBSCAN[,1])
+res_lda_bis_hierarchique = lda(data_train_hierarchique[,2:36], grouping=data_train_hierarchique[,1])
+res_lda_bis_modele_melange= lda(data_train_modele_melange[,2:36], grouping=data_train_modele_melange[,1])
+
+prev_kmeans = predict(res_lda_bis_kmeans, newdata = data_test_kmeans[,2:36], type='response')
+prev_DBSCAN = predict(res_lda_bis_DBSCAN, newdata = data_test_DBSCAN[,2:36], type='response')
+prev_hierarchique = predict(res_lda_bis_hierarchique, newdata = data_test_hierarchique[,2:36], type='response')
+prev_modele_melange = predict(res_lda_bis_modele_melange, newdata = data_test_modele_melange[,2:36], type='response')
+```
+
+```{r, echo=F, include=FALSE}
+table(prev_kmeans$class, data_test_kmeans[,1])
+```
+
+```{r,echo=F, include=FALSE}
+table(prev_DBSCAN$class, data_test_DBSCAN[,1])
+```
+
+```{r, echo=F, include=FALSE}
+table(prev_hierarchique$class, data_test_hierarchique[,1])
+```
+
+```{r, echo=F, include=FALSE}
+table(prev_modele_melange$class, data_test_modele_melange[,1])
+```
+
+```{r, echo=F, include=FALSE}
+X = cbind(reskmeans$cluster,Data)
+```
+
+```{r, include=FALSE}
+library(MASS)
+res_lda = lda(X[,2:36], grouping=X[,1])
+print(res_lda)
+```
+La LDA permet de montrer que nos deux clusters sont bien séparés par le premier axe discriminant. Cependant, ils ne sont pas totalement séparés car il y a quelques individus du premier cluster qui viennent se mélanger aux individus du second.
+
+Maitenant, nous séparons nos données en train et test. Ensuite, on réalise une LDA sur le dataset train avec les labels obtenus par l'algorithme des kmeans. Finalement, on prédit les classes d'appartenance du dataset test.
+```{r, echo=F, include=FALSE}
+n=nrow(X)
+data_eval = X[sample(1:n,n),] # tirage aléatoire # mélange
+partition = sample(2,nrow(data_eval),replace=TRUE,prob=c(0.8,0.2))
+#train/test
+data_train = data_eval[partition==1,]
+data_test = data_eval[partition==2,]
+res_lda_bis = lda(data_train[,2:36], grouping=data_train[,1])
+
+prev = predict(res_lda_bis, newdata = data_test[,2:36], type='response')
+```
+
+Cette prédiction permet dans un deuxième temps de calculer la correlation entre les variables Ti_jh_rk et l'axe discriminant pour déterminer quelles variables expliquent nos clusters.
+```{r, include=FALSE}
+corel = cor(data_test[,1:36],prev$x)
+poids = corel^2/sum(corel^2)
+poids_moyen = 100/36
+cat("poids :", poids*100)
+cat("poids_moyen :", poids_moyen, "%")
+```
+Tous les poids supérieurs au poids moyen sont les variables qui expliquent l'axe discriminant. 
+On en déduit que cet axe discriminant est expliqué par les variables T1_1h_R1, T2_2h_R1, T2_4h_R1, T2_5h_R1, T2_6h_R1, T3_1h_R1, T3_3h_R1, T3_4h_R1, T3_5h_R1, T3_6h_R1 puis exactement les mêmes variables pour le deuxième réplicat.
+Il semblerait donc que l'on sépare des gènes qui sont plutôt caractérisés par les traitements 2 à 2, 4, 5 et 6 heures puis 1, 4 4 et 5 heures pour le traitement 3 et 1 heure pour le traitement 1.
+
+
+# Clustering sur les traitements
+
+Dans cette partie nous allons traiter du clustering sur les traitements. Cette partie à aussi été traitée en Python dans la partie Clustering des variables. Pour ce faire nous transposons la matrice centrée réduite de départ. La matrice possédant trop de colonnes, nous décidons de réaliser une ACP pour réduire les dimensions et faciliter le clustering. Nous décidons dans cette partie de n'utiliser que trois algorithmes (kmeans, classification hiérarchique et mélange gaussien). 
+
+```{r, echo=F, include=FALSE}
+res = prcomp(t(Data_cr), scale = FALSE)
+res.ind <- get_pca_ind(res)
+respca_clustering_variables = res.ind$coord[,1:4]
+```
+
+Nous raisonnons de la même manière pour tout les algorithmes utilisés. Nous calculons d'abord le nombre de classes adéquat à chaque méthode. Dans beaucoup de cas nous obtenons des nombres de classes différents entre les critères, nous affichons donc la table de contingence des classifications obtenues avec les différents algorithmes pour sélectionner la meilleure classification et contrôler le nombre de classes. Nous réalisons ensuite le clustering avec les nombres de classes trouvés. Enfin nous calculons le ARI pour comparer les différents algorithmes.
+Nous décidons de ne pas afficher toutes les sorties mais vous retrouverez toutes ces étapes dans le code pour chacune des méthodes.
+
+## Kmeans
+
+Nous réalisons dans un premier temps la sélection du nombre de classes par les critères silhouette et inertie intra-classe pour l'aglorithme Kmeans.
+```{r silh_kmeans_intra, echo=F,  fig.width=4, fig.height=4,  fig.show="hide", include=FALSE}
+
+Kmax <- 20
+reskmeansbis <- matrix(0, nrow = nrow(respca_clustering_variables), ncol = (Kmax - 1))
+Iintra <- NULL
+for (k in 2:Kmax) {
+    aux <- kmeans(respca_clustering_variables, k, iter.max = 100, nstart = 25)
+    reskmeansbis[, (k - 1)] <- aux$cluster
+    Iintra <- c(Iintra, aux$tot.withinss)
+}
+
+df <- data.frame(K = 2:Kmax, Iintra = Iintra)
+ggplot(df, aes(x = K, y = Iintra)) + geom_line() + geom_point()
+```
+
+```{r, echo=FALSE,fig.width=4, fig.height=4, fig.cap="\\label{fig:silh_kmeans_traitements}Sélection du nombre de classes avec le critère silhouette", fig.align="center"}
+
+Silhou<-NULL
+Kmax<-15
+reskmeanscl<-matrix(0,nrow=nrow(respca_clustering_variables),ncol=Kmax-1)
+for (k in 2:Kmax){
+  resaux<-kmeans(respca_clustering_variables, centers = k)
+  reskmeanscl[,k-1]<-resaux$cluster
+  aux<-silhouette(reskmeanscl[,k-1], daisy(respca_clustering_variables))
+  Silhou<-c(Silhou,mean(aux[,2]))
+}
+
+
+res_silhouette1=fviz_nbclust(respca_clustering_variables, kmeans, method = "silhouette")
+aux<-silhouette(kmeans(respca_clustering_variables, centers = 3)$cluster,dist(respca_clustering_variables))
+res_silhouette2=fviz_silhouette(aux)+theme(plot.title = element_text(size =9))
+grid.arrange(res_silhouette1,res_silhouette2,nrow=2,ncol=2)
+```
+On maximise le critère silhouette pour $K=3$ classes. On remarque cependant sur la figure \ref{fig:silh_kmeans_traitements}   que le premier cluster comporte des individus qui sont plutôt éloignés du centre de gravité de la classe.
+```{r, echo=FALSE, include = FALSE}
+reskmeans_variables_1 = kmeans(respca_clustering_variables, 3)
+table(reskmeans_variables_1$cluster)
+```
+```{r, echo=FALSE, include = FALSE}
+
+reskmeans_variables_2 = kmeans(respca_clustering_variables, 5)
+
+table(reskmeans_variables_2$cluster)
+```
+
+Le résultat obtenu avec l'algorithme Kmeans et $K=3$ classes est visible à la figure \ref{fig:kmeans_traitements}. Nous observons 3 clusters assez bien séparés.
+
+
+```{r, echo=F, fig.cap="\\label{fig:kmeans_traitements}Classification à l'aide de l'algorithme Kmeans", fig.align="center"}
+
+reskmeans_traitements<- kmeans(respca_clustering_variables, 3)
+fviz_cluster(reskmeans_traitements, data = respca_clustering_variables,
+             palette = "Dark", 
+             )
+```
+
+## Classification hiérarchique 
+Réalisons maintenant le clustering à l'aide de la classification hiérarchique. Nous faisons toutes les mesures d'agrégation avec la distance euclidienne. Nous avons dans un premier temps choisi le nombre de classes avec les critères Calinski-Halbraz et l'inertie intra-classe. Ensuite, comme les nombres de classes étaient différents, nous avons coupé l'arbre pour les deux valeurs de K obtenues et nous avons sélectionné la méthode dont le ARI était le meilleure en comparant avec l'algorithme Kmeans et en affichant la table de contingence.
+
+```{r,echo=F, fig.show='hide'}
+resingle<- hclust(dist(respca_clustering_variables, method = "euclidean"), method = "single")
+CH <- NULL
+Kmax <- 20
+for (k in 2:Kmax) {
+    CH <- c(CH, index.G1(respca_clustering_variables, cutree(resingle, k)))
+}
+daux <- data.frame(NbClust = 2:Kmax, CH = CH)
+ggplot(daux, aes(x = NbClust, y = CH)) + geom_line() + geom_point()
+```
+
+```{r,echo=F, fig.cap="\\label{fig:inertie_intra_hierarchique_traitements}Inertie intra-classe pour la mesure d'agrégation single", fig.height=4, fig.width=4, fig.align="center"}
+Kmax <- 10
+df <- data.frame(K = 1:Kmax, height = sort(resingle$height, decreasing = T)[1:Kmax])
+ggplot(df, aes(x = K, y = height)) + geom_line() + geom_point()
+```
+
+
+
+D'après le critère du coude nous sélectionnons $K=3$ classes comme le montre la figure  \ref{fig:inertie_intra_hierarchique_traitements}.
+
+
+```{r,echo=FALSE, include=FALSE}
+resingle<- hclust(dist(respca_clustering_variables, method = "euclidean"), method = "single")
+Class_signle_20 = cutree(resingle, k=20)
+Class_single_3 = cutree(resingle, k=3)
+```
+
+```{r, echo=FALSE, include = FALSE}
+table(Class_signle_20)
+table(Class_single_3)
+```
+
+
+```{r, eval=FALSE, include=FALSE}
+adjustedRandIndex(Class_signle_20, reskmeans_variables_1$cluster)
+
+```
+```{r}
+adjustedRandIndex(Class_single_3, reskmeans_variables_1$cluster)
+```
+Les classifications single et Kmeans semblent similaires car le ARI est proche de 1. C'est avec cette mesure d'agrégation que nous obtenons le plus grand ARI en comparant avec l'algorithme des Kmeans. 
+
+```{r,echo=F, fig.show='hide'}
+resaverage<- hclust(dist(respca_clustering_variables, method = "euclidean"), method = "average")
+CH <- NULL
+Kmax <- 20
+for (k in 2:Kmax) {
+    CH <- c(CH, index.G1(respca_clustering_variables, cutree(resaverage, k)))
+}
+daux <- data.frame(NbClust = 2:Kmax, CH = CH)
+ggplot(daux, aes(x = NbClust, y = CH)) + geom_line() + geom_point()
+```
+
+```{r,echo=F, fig.show='hide'}
+Kmax <- 10
+df <- data.frame(K = 1:Kmax, height = sort(resaverage$height, decreasing = T)[1:Kmax])
+ggplot(df, aes(x = K, y = height)) + geom_line() + geom_point()
+```
+
+```{r,echo=F, include=FALSE, fig.show='hide'}
+resaverage<- hclust(dist(respca_clustering_variables, method = "euclidean"), method = "average")
+Class_average_20 = cutree(resaverage, k=20)
+Class_average_6 = cutree(resaverage, k=3)
+```
+
+```{r, echo=F, include=FALSE}
+table(Class_average_20)
+table(Class_average_6)
+```
+```{r, echo=FALSE, include=FALSE}
+adjustedRandIndex(Class_average_6, reskmeans_variables_1$cluster)
+adjustedRandIndex(Class_average_20, reskmeans_variables_1$cluster)
+```
+
+```{r,echo=F, fig.show='hide'}
+recomplete<- hclust(dist(respca_clustering_variables, method = "euclidean"), method = "complete")
+CH <- NULL
+Kmax <- 20
+for (k in 2:Kmax) {
+    CH <- c(CH, index.G1(respca_clustering_variables, cutree(recomplete, k)))
+}
+daux <- data.frame(NbClust = 2:Kmax, CH = CH)
+ggplot(daux, aes(x = NbClust, y = CH)) + geom_line() + geom_point()
+```
+
+```{r,echo=F, fig.show='hide'}
+Kmax <- 10
+df <- data.frame(K = 1:Kmax, height = sort(recomplete$height, decreasing = T)[1:Kmax])
+ggplot(df, aes(x = K, y = height)) + geom_line() + geom_point()
+```
+
+```{r,echo=F, fig.show='hide'}
+recomplete<- hclust(dist(respca_clustering_variables, method = "euclidean"), method = "complete")
+Class_complete_20 = cutree(recomplete, k=20)
+Class_complete_3 = cutree(recomplete, k=3)
+```
+
+```{r, echo=F, include=FALSE}
+table(Class_complete_20)
+table(Class_complete_3)
+```
+```{r, echo=F, include=FALSE}
+adjustedRandIndex(Class_complete_3, reskmeans_variables_1$cluster)
+adjustedRandIndex(Class_complete_20, reskmeans_variables_1$cluster)
+```
+
+
+```{r,echo=F, fig.show='hide'}
+reward<- hclust(dist(respca_clustering_variables, method = "euclidean"), method = "ward.D2")
+CH <- NULL
+Kmax <- 20
+for (k in 2:Kmax) {
+    CH <- c(CH, index.G1(respca_clustering_variables, cutree(reward, k)))
+}
+daux <- data.frame(NbClust = 2:Kmax, CH = CH)
+ggplot(daux, aes(x = NbClust, y = CH)) + geom_line() + geom_point()
+```
+
+```{r,echo=F, fig.show='hide'}
+Kmax <- 10
+df <- data.frame(K = 1:Kmax, height = sort(reward$height, decreasing = T)[1:Kmax])
+ggplot(df, aes(x = K, y = height)) + geom_line() + geom_point()
+```
+
+```{r,echo=F}
+reward<- hclust(dist(respca_clustering_variables, method = "euclidean"), method = "ward.D2")
+Class_ward_20 = cutree(reward, k=20)
+Class_ward_3 = cutree(reward, k=3)
+```
+
+```{r, echo=F, include=FALSE}
+table(Class_ward_20)
+table(Class_ward_3)
+```
+```{r, echo=FALSE, include=FALSE}
+adjustedRandIndex(Class_ward_3, reskmeans_variables_1$cluster)
+adjustedRandIndex(Class_ward_20, reskmeans_variables_1$cluster)
+```
+
+
+## Modèle de mélanges gaussiens 
+
+Dans une dernière partie nous allons utiliser le modèle de mélange gaussien pour réaliser notre classification.
+
+```{r, echo=F, fig.show='hide', include=FALSE}
+#La ligne de code suivante peut-être assez longue a s'exécuter ...
+Modele_melange_traitements<-Mclust(respca_clustering_variables, G=2:15)
+summary(Modele_melange_traitements)
+```
+
+Nous sélectionnons le nombre de cluster avec les critères BIC et ICL. Les deux critères donnent exactement le même résultat. Nous choissons la forme VEV avec 4 clusters comme le montre la figure \ref{fig:modele_melange_traitements}. 
+
+```{r,echo=F, fig.cap="\\label{fig:modele_melange_traitements}Sélection de modèle avec les mélanges gaussiens"}
+fviz_mclust(Modele_melange_traitements,what="BIC")
+summary(Modele_melange_traitements)
+```
+Nous observons à peu près les mêmes clusters qu'avec l'algorithme des Kmeans. Cependant, le cluster qui se situe tout à droite dans la figure \ref{fig:kmeans_traitements} semble s'être divisé en deux pour le modèle de mélange gaussien comme on le voit dans la figure \ref{fig:modele_melange_res}.
+
+```{r, echo=F, include=FALSE, fig.cap="\\label{fig:modele_melange_res}Classification d'après les mélanges gaussiens avec la forme VEV et 4 classes"}
+fviz_cluster(Modele_melange_traitements)
+table(Modele_melange_traitements$classification)
+```
+
+```{r,echo=F, include=FALSE}
+resICL<-mclustICL(respca_clustering_variables,G=2:15)
+summary(resICL)
+```
+
+Observons maintenant les probabilités associées de la figure \ref{fig:proba}.
+
+```{r, echo=F, fig.cap="\\label{fig:proba}Probabilité à priori", fig.align='center'}
+Aux <- data.frame(label = paste("Cl", Modele_melange_traitements$classification, sep = ""), proba = apply(Modele_melange_traitements$z,
+    1, max))
+h1 <- ggplot(Aux, aes(x = label, y = proba)) + geom_boxplot()
+h2 <- fviz_cluster(Modele_melange_traitements, data = respca_clustering_variables, ellipse = F, geom = "point") + ggtitle("") +
+    theme(legend.position = "none")
+grid.arrange(h1, h2, ncol = 2)
+```
+On remarque qu'on obtient deux outliers pour le deuxième cluster. Les traitements semblent très bien affectés à chacun de leur groupe puisque toutes les probabilités sont entre 1 et 0.985.
+
+```{r, echo=F, include=FALSE}
+table(Modele_melange_traitements$classification)
+```
+
+Comparons les résultats avec les autres algorithmes.
+
+Il semblerait que les classifications kmeans et modèle de mélange gaussien soit assez similaires car le ARI est proche de 1. Nous l'avions vu en affichant les clusters.
+```{r}
+adjustedRandIndex(Modele_melange_traitements$classification, reskmeans_variables_1$cluster)
+```
+
+Cependant, la classification ne semble pas être la même avec la classification hiérarchique.
+```{r}
+adjustedRandIndex(Modele_melange_traitements$classification, Class_single_3)
+```
+
+## Interprétation des clusters
+
+Les schémas précédemment affichés avec les algorithmes de mélanges gaussiens ainsi que la classification hiérarchique permettent de diviser le dataset en 3 ou 4 clusters.
+Nous interprétons les résultats obtenus avec les algorithmes Kmeans et modèle de mélange car ils donnent à peu près la même classification contrairement à la classification hiérarchique.
+Pour l'algorithme des kmeans nous obtenons l'interprétation suivante : 
+Le premier cluster correspond au traitement 1 à toutes les heures et tous les réplicats.
+Le second cluster correspond aux traitemetns 2 et 3 entre 2 et 6 heures pour les deux réplicats.
+Finalement le dernier cluster correspond aux traitements 2 et 3 à 1 heure pour les deux réplicats.
+
+Pour l'algorithme des mélanges gaussiens nous avons exactement les 3 mêmes clusters que précédemment. Nous avons en plus un dernier cluster où nous avons les traitements 2 et 3 entre 4 et 6 heures pour les deux réplicats.
+
+Nous interprétons maintenant les clusters selon la sur ou sous expression des gènes.
+Veuillez vous référer au code Python pour cette partie car nous n'avons pas réussi à reproduire cela en R (Partie Interpretation clusters de variables). 
+On voit que les gènes du traitements 1, qui forment un cluster de variables, sont en moyenne centrées autour de 0, suivies en module par les gènes du traitement 2 et 3 de la première heure, qui marquent un début de sur-expression / sous-expression, sans pour autant s'éloigner des gènes du traitement 1 en moyenne d'expressions. Ces 4 variables constituent notre second cluster. Enfin, les gènes restantes (Traitements 2 et 3 de 2 à 6h), la sur-expression /sous-expression est clairement distinguable, car en moyenne, les valeurs sont en modules supérieures à 1. C'est notre 3e cluster de variables.
+
+# Conclusion
+En conclusion, grâce aux statistiques descriptives nous avions vu que le premier axe de l'ACP était expliqué par les traitements 2 et 3. Cette hypothèse a été vérifiée en faisant la classification des gènes mais avec une plus grande précision. En effet, grâce aux algorithmes de clustering nous avons vu que les traitements sont regroupés en 3 clusters correspondant respectivement au traitement 1 à toutes les heures et tout les réplicats, un deuxième correspondant aux traitements 2 et 3 entre 2 et 6 heures pour les deux réplicats et enfin un dernier qui regroupe les traitements 2 et 3 à 1 heure pour les deux réplicats.
+Le clsutering sur les gènes nous a permis de voir qu'ils sont caractérisés en deux clusters. Un premier où ils sont sur-exprimés et un deuxième où ils sont sous-exprimés.
+
+
+

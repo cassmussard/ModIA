@@ -1,0 +1,26 @@
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'smpi/privatization' to '1'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'smpi/np' to '4'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'smpi/hostfile' to 'hostfiles/cluster_hostfile.txt'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'tracing' to 'yes'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'tracing/filename' to 'smpi_simgrid.trace'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'tracing/smpi' to 'yes'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'surf/precision' to '1e-9'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'network/model' to 'SMPI'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'smpi/tmpdir' to '/home/fgrivet/tmp_simgrid'
+[0.000000] [xbt_cfg/INFO] Configuration change: Set 'smpi/tmpdir' to '/tmp'
+[0.000000] [smpi_config/INFO] You did not set the power of the host running the simulation.  The timings will certainly not be accurate.  Use the option "--cfg=smpi/host-speed:<flops>" to set its value.  Check https://simgrid.org/doc/latest/Configuring_SimGrid.html#automatic-benchmarking-of-smpi-code for more information.
+[snorki.enseeiht.fr] (p2p) measured_wtime = 1.144750s (la=0) | 50.650411 Gflop/s
+[snorki.enseeiht.fr] (g) measured_wtime = 1.082279s | 53.574042 Gflop/s
+GEMM is correct ( 0.00000e+00)
+[snorki.enseeiht.fr] (p2p) measured_wtime = 1.148481s (la=0) | 50.485866 Gflop/s
+[snorki.enseeiht.fr] (g) measured_wtime = 1.085504s | 53.414870 Gflop/s
+GEMM is correct ( 0.00000e+00)
+[snorki.enseeiht.fr] (p2p) measured_wtime = 1.146620s (la=0) | 50.567805 Gflop/s
+[snorki.enseeiht.fr] (g) measured_wtime = 1.083840s | 53.496879 Gflop/s
+GEMM is correct ( 0.00000e+00)
+[snorki.enseeiht.fr] (p2p) measured_wtime = 1.151754s (la=0) | 50.342397 Gflop/s
+[snorki.enseeiht.fr] (g) measured_wtime = 1.090034s | 53.192889 Gflop/s
+GEMM is correct ( 0.00000e+00)
+[snorki.enseeiht.fr] (p2p) measured_wtime = 1.160477s (la=0) | 49.963986 Gflop/s
+[snorki.enseeiht.fr] (g) measured_wtime = 1.085899s | 53.395444 Gflop/s
+GEMM is correct ( 0.00000e+00)

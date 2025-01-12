@@ -1,0 +1,8 @@
+lib: [
+  "_build/install/default/lib/arkanoid/META"
+  "_build/install/default/lib/arkanoid/dune-package"
+  "_build/install/default/lib/arkanoid/opam"
+]
+bin: [
+  "_build/install/default/bin/arkanoid"
+]
